@@ -4,14 +4,14 @@
 
 Neuriplo UI provides a thin web interface over the Neuriplo inference pipeline and a reproducible end-to-end test harness for exercising that pipeline from a user-facing workflow.
 
-The product should make it easy to answer a simple question: **can a selected task, model, backend, and source successfully run through Neuriplo and produce the expected result?**
+The product should make it easy to answer a simple question: **can a selected task, model, execution workflow, and source successfully run through Neuriplo and produce the expected result?**
 
 ## Primary goals
 
 1. Let a user configure an inference run by selecting:
    - task;
    - model;
-   - inference backend;
+   - execution workflow: a specified local inference backend or a client-server workflow;
    - source.
 2. Launch the corresponding `neuriplo-infer` pipeline without exposing CLI complexity in the browser.
 3. Surface the important outputs of a run:
@@ -37,6 +37,8 @@ neuriplo-ui
 ```
 
 `neuriplo-infer` must remain independently usable without the UI. Neuriplo UI should consume a stable, machine-readable contract rather than duplicate task or backend registries.
+
+Execution topology is a first-class part of that contract. A remote client-server workflow is an alternative to choosing a local backend, not another local backend value. For the current KServe V2 integration, the remote branch selects endpoint, model name/version, and HTTP or gRPC transport while preprocessing and postprocessing remain in `neuriplo-infer`.
 
 ## Target users
 

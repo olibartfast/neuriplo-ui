@@ -50,6 +50,25 @@ POST /api/runs
 
 The current `/api/capabilities` payload is scaffold data only. It should be replaced by data obtained from `neuriplo-infer --capabilities` or an equivalent stable command.
 
+## Execution workflows
+
+Execution topology must be represented explicitly:
+
+```text
+local
+  -> select an available compiled inference backend
+  -> provide local model weights
+
+client_server
+  -> select an advertised remote protocol/runtime
+  -> configure endpoint, remote model, version, and transport
+  -> do not require local model weights
+```
+
+The current client-server implementation uses KServe V2 over HTTP or gRPC. `neuriplo-infer` keeps preprocessing and postprocessing local and sends inference tensors to the remote runtime. KServe is therefore not modeled as one of the local backend values.
+
+The capabilities contract should advertise which workflows the current build supports. Local backend availability and remote protocol/transport availability belong under their respective workflow branches.
+
 ## Inference integration
 
 The preferred integration boundary is the `neuriplo-infer` executable rather than linking C++ directly into the Node process.
@@ -70,7 +89,10 @@ A run response should eventually expose at least:
   "status": "success",
   "task": "object_detection",
   "model": "yolo26",
-  "backend": "onnx_runtime",
+  "execution": {
+    "workflow": "local",
+    "backend": "onnx_runtime"
+  },
   "latency_ms": 12.7,
   "artifacts": [],
   "stdout": "",
@@ -92,7 +114,7 @@ browser
   -> neuriplo-ui server
   -> neuriplo-infer
   -> neuriplo / neuriplo-tasks
-  -> selected inference backend
+  -> selected local backend OR remote inference server
   -> result
 ```
 
@@ -122,4 +144,4 @@ Do not commit machine-specific model paths or credentials.
 - No WebAssembly inference path.
 - No duplicated TypeScript task/backend registry as a long-term source of truth.
 - No database until persisted run history becomes a real requirement.
-- No Kubernetes dependency for local usage; KServe is treated as an inference option exposed through Neuriplo.
+- No Kubernetes dependency for local usage; client-server execution is an optional workflow exposed through Neuriplo.

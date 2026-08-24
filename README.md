@@ -6,7 +6,8 @@ Neuriplo UI is intentionally kept separate from `neuriplo-infer`. The UI configu
 
 ## Goals
 
-- Select task, model, inference backend, and source from a browser UI.
+- Select task, model, execution workflow, and source from a browser UI.
+- Run through either a selected local inference backend or a client-server workflow.
 - Launch reproducible `neuriplo-infer` runs.
 - Display results, timings, logs, and generated artifacts.
 - Provide a browser-driven E2E harness for the complete Neuriplo pipeline.
