@@ -16,6 +16,8 @@ Goal: remove capability knowledge from the UI and make `neuriplo-infer` authorit
 - [ ] Add `neuriplo-infer --capabilities` or equivalent command.
 - [ ] Return supported task/model combinations.
 - [ ] Return available local inference backends for the current build.
+- [ ] Return supported execution workflows separately from local backend choices.
+- [ ] Return available client-server protocols and transports for the current build.
 - [ ] Return supported source types and task-specific parameters.
 - [ ] Define a versioned JSON schema for capabilities.
 - [ ] Add contract tests in `neuriplo-infer`.
@@ -28,7 +30,9 @@ Goal: execute one real pipeline from the browser.
 - [ ] Define the request schema for `POST /api/runs`.
 - [ ] Configure `NEURIPLO_INFER_BIN`.
 - [ ] Spawn `neuriplo-infer` using an argument array.
-- [ ] Support task, model, backend, weights, and source selection.
+- [ ] Support task, model, execution workflow, and source selection.
+- [ ] Require a compatible local backend and weights only for local execution.
+- [ ] Require endpoint, remote model metadata, and transport only for client-server execution.
 - [ ] Capture exit code, stdout, stderr, and wall-clock duration.
 - [ ] Parse `--output_format=json` results.
 - [ ] Normalize failures into structured API errors.
@@ -42,7 +46,9 @@ Goal: make the configurator capability-driven.
 
 - [ ] Fetch capabilities from the server on startup.
 - [ ] Make model choices depend on the selected task.
-- [ ] Make backend choices depend on model compatibility/availability.
+- [ ] Let the user choose local or client-server execution when both are available.
+- [ ] Make local backend choices depend on model compatibility/availability.
+- [ ] Show endpoint, remote model/version, and transport controls only for client-server execution.
 - [ ] Add file/image/video source selection.
 - [ ] Add task-specific advanced controls only when relevant.
 - [ ] Add weights/model-path handling.
@@ -57,7 +63,7 @@ Initial advanced controls may include:
 - warmup;
 - benchmark iterations;
 - text prompts / VLM prompt;
-- KServe endpoint and transport.
+- client-server timeout and retry controls.
 
 ## Phase 4 — Results and diagnostics
 
@@ -78,7 +84,8 @@ Goal: turn Neuriplo UI into a regression harness rather than only a manual front
 - [ ] Start web/server automatically from Playwright configuration or CI.
 - [ ] Add deterministic fixture assets.
 - [ ] Test at least one pipeline per major task family.
-- [ ] Test backend switching when CI runners support the backend.
+- [ ] Test local backend switching when CI runners support the backend.
+- [ ] Test client-server execution against a deterministic test runtime.
 - [ ] Assert output artifact creation.
 - [ ] Assert structured result semantics rather than only HTTP success.
 - [ ] Store Playwright traces and logs on failure.
@@ -96,7 +103,7 @@ Object Detection
 
 ## Phase 6 — Remote inference and benchmark workflows
 
-- [ ] Expose KServe endpoint/model/transport configuration.
+- [ ] Expose client-server endpoint/model/version/transport configuration.
 - [ ] Show remote server metadata and advertised platform.
 - [ ] Compare local and remote inference runs.
 - [ ] Add repeated benchmark runs and summary statistics.
@@ -112,4 +119,4 @@ Object Detection
 
 ## Guiding rule
 
-Do not solve capability drift inside the frontend. When a new task, model, backend, or parameter is added to Neuriplo, prefer extending the machine-readable contract so the UI discovers it rather than adding another hard-coded list.
+Do not solve capability drift inside the frontend. When a new task, model, execution workflow, backend, remote protocol, transport, or parameter is added to Neuriplo, prefer extending the machine-readable contract so the UI discovers it rather than adding another hard-coded list.
