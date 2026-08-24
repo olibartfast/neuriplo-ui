@@ -48,7 +48,10 @@ GET  /api/capabilities
 POST /api/runs
 ```
 
-The current `/api/capabilities` payload is scaffold data only. It should be replaced by data obtained from `neuriplo-infer --capabilities` or an equivalent stable command.
+`/api/capabilities` executes the binary configured by `NEURIPLO_INFER_BIN`
+with `--capabilities`, validates the versioned response, and returns it without
+maintaining a second task/backend registry in TypeScript. Missing configuration
+returns `503`; execution or contract failures return `502`.
 
 ## Execution workflows
 
