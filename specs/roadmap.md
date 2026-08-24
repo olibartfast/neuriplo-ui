@@ -13,15 +13,15 @@
 
 Goal: remove capability knowledge from the UI and make `neuriplo-infer` authoritative.
 
-- [ ] Add `neuriplo-infer --capabilities` or equivalent command.
-- [ ] Return supported task/model combinations.
-- [ ] Return available local inference backends for the current build.
-- [ ] Return supported execution workflows separately from local backend choices.
-- [ ] Return available client-server protocols and transports for the current build.
-- [ ] Return supported source types and task-specific parameters.
-- [ ] Define a versioned JSON schema for capabilities.
-- [ ] Add contract tests in `neuriplo-infer`.
-- [ ] Replace the temporary `/api/capabilities` data in this repository.
+- [x] Add `neuriplo-infer --capabilities` or equivalent command.
+- [x] Return supported task/model combinations.
+- [x] Return available local inference backends for the current build.
+- [x] Return supported execution workflows separately from local backend choices.
+- [x] Return available client-server protocols and transports for the current build.
+- [x] Return supported source types and task-specific parameters.
+- [x] Define a versioned JSON schema for capabilities.
+- [x] Add contract tests in `neuriplo-infer`.
+- [x] Replace the temporary `/api/capabilities` data in this repository.
 
 ## Phase 2 — Real inference runner
 

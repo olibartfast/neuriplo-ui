@@ -13,6 +13,7 @@
     "build": "npm-run-all build:web build:server",
     "build:web": "npm --workspace @neuriplo-ui/web run build",
     "build:server": "npm --workspace @neuriplo-ui/server run build",
+    "test:server": "npm --workspace @neuriplo-ui/server run test",
     "test:e2e": "npm --workspace @neuriplo-ui/e2e run test"
   },
   "engines": {

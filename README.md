@@ -26,6 +26,7 @@ specs/       Mission, technical stack, and roadmap
 
 ```bash
 npm install
+export NEURIPLO_INFER_BIN=/path/to/neuriplo-infer
 npm run dev
 ```
 
@@ -36,6 +37,18 @@ npm run dev:web
 npm run dev:server
 ```
 
+The local adapter exposes `GET /api/capabilities`. It invokes
+`$NEURIPLO_INFER_BIN --capabilities` with an argument array and validates schema
+version 1 before returning the response. This keeps task, model, local backend,
+and client-server workflow availability authoritative in the compiled binary.
+
+Run the build and server contract tests with:
+
+```bash
+npm run build
+npm run test:server
+```
+
 ## Specifications
 
 - [Mission](specs/mission.md)
@@ -44,4 +57,6 @@ npm run dev:server
 
 ## Status
 
-Initial scaffold. The first integration target is a machine-readable contract with `neuriplo-infer`, starting with capabilities discovery and JSON run results.
+Roadmap Phase 1 is implemented: machine-readable capabilities are produced by
+`neuriplo-infer` and discovered by the local API adapter. Phase 2 will execute
+real inference runs and return structured results.
