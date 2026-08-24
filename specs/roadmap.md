@@ -44,17 +44,26 @@ Milestone: run a known object-detection model against a fixture image from the U
 
 Goal: make the configurator capability-driven.
 
-- [ ] Fetch capabilities from the server on startup.
-- [ ] Make model choices depend on the selected task.
-- [ ] Let the user choose local or client-server execution when both are available.
+- [x] Fetch capabilities from the server on startup.
+- [x] Make model choices depend on the selected task.
+- [x] Let the user choose local or client-server execution when both are available.
 - [ ] Make local backend choices depend on model compatibility/availability.
-- [ ] Show endpoint, remote model/version, and transport controls only for client-server execution.
+- [x] Show endpoint, remote model/version, and transport controls only for client-server execution.
 - [ ] Add file/image/video source selection.
-- [ ] Add task-specific advanced controls only when relevant.
-- [ ] Add weights/model-path handling.
-- [ ] Display validation before launching invalid configurations.
+- [x] Add task-specific advanced controls only when relevant.
+- [x] Add weights/model-path handling.
+- [x] Display validation before launching invalid configurations.
 
-Initial advanced controls may include:
+Two items remain open, and both need contract support rather than UI work:
+
+- backend choices currently follow the execution workflow, because the contract
+  advertises backends per workflow and not per model; per-model backend
+  compatibility has to be advertised before the UI can narrow the list;
+- source selection covers source *types* only. Choosing an actual file or
+  camera index belongs with the Phase 2 runner, which needs the path anyway.
+
+Advanced controls are rendered from the contract's parameter catalog rather than
+from a hard-coded list, so the following arrive automatically:
 
 - confidence threshold;
 - NMS threshold;
