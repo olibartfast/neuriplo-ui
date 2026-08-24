@@ -48,6 +48,12 @@ GET  /api/capabilities
 POST /api/runs
 ```
 
+The frontend holds no task, model, backend, protocol, or parameter list. It
+fetches `/api/capabilities` on startup and clamps the current selection to what
+the response advertises, so an incompatible model or source cannot survive a
+task change. Parameter controls are generated from the contract's parameter
+catalog, keyed on `value_type`.
+
 `/api/capabilities` executes the binary configured by `NEURIPLO_INFER_BIN`
 with `--capabilities`, validates the versioned response, and returns it without
 maintaining a second task/backend registry in TypeScript. Missing configuration

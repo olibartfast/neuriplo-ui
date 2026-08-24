@@ -42,11 +42,17 @@ The local adapter exposes `GET /api/capabilities`. It invokes
 version 1 before returning the response. This keeps task, model, local backend,
 and client-server workflow availability authoritative in the compiled binary.
 
-Run the build and server contract tests with:
+The frontend renders every choice from that response. Tasks, models, execution
+workflows, local backends, protocols, transports, source types, and the whole
+advanced-parameter form are derived from the contract, so a new task or backend
+in `neuriplo-infer` appears in the UI without a frontend change. `npm run dev`
+proxies `/api` to the adapter; override the target with `NEURIPLO_UI_API`.
+
+Run the build and tests with:
 
 ```bash
 npm run build
-npm run test:server
+npm test
 ```
 
 ## Specifications
@@ -58,5 +64,7 @@ npm run test:server
 ## Status
 
 Roadmap Phase 1 is implemented: machine-readable capabilities are produced by
-`neuriplo-infer` and discovered by the local API adapter. Phase 2 will execute
-real inference runs and return structured results.
+`neuriplo-infer` and discovered by the local API adapter. Phase 3 is largely
+implemented on top of it: the configurator holds no capability lists of its own.
+Phase 2 is next and will execute real inference runs and return structured
+results, so the run button stays disabled until then.

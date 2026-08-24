@@ -2,10 +2,7 @@
   "name": "neuriplo-ui",
   "private": true,
   "version": "0.1.0",
-  "workspaces": [
-    "apps/*",
-    "e2e"
-  ],
+  "workspaces": ["apps/*", "e2e"],
   "scripts": {
     "dev": "npm-run-all --parallel dev:web dev:server",
     "dev:web": "npm --workspace @neuriplo-ui/web run dev",
@@ -13,6 +10,8 @@
     "build": "npm-run-all build:web build:server",
     "build:web": "npm --workspace @neuriplo-ui/web run build",
     "build:server": "npm --workspace @neuriplo-ui/server run build",
+    "test": "npm-run-all test:web test:server",
+    "test:web": "npm --workspace @neuriplo-ui/web run test",
     "test:server": "npm --workspace @neuriplo-ui/server run test",
     "test:e2e": "npm --workspace @neuriplo-ui/e2e run test"
   },
