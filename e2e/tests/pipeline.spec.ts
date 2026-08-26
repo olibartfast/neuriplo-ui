@@ -8,7 +8,16 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 async function optionsOf(page: Page, testId: string): Promise<string[]> {
-  return page.getByTestId(testId).locator("option").allTextContents();
+  const control = page.getByTestId(testId);
+  if ((await control.evaluate((element) => element.tagName)) === "INPUT") {
+    return page
+      .getByTestId(`${testId}-suggestions`)
+      .locator("option")
+      .evaluateAll((options) =>
+        options.map((option) => option.getAttribute("value") ?? ""),
+      );
+  }
+  return control.locator("option").allTextContents();
 }
 
 test("renders a configurator driven by discovered capabilities", async ({
@@ -50,6 +59,68 @@ test("narrows model choices to the selected task", async ({ page }) => {
   // At least one task must offer a different model set, otherwise the UI is
   // not actually reacting to the task selection.
   expect(seen.size).toBeGreaterThan(1);
+});
+
+test("accepts advertised aliases and wildcard model selectors", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+
+  const tasks = await page.evaluate(async () => {
+    const response = await fetch("/api/capabilities");
+    const payload = (await response.json()) as {
+      tasks: Array<{
+        id: string;
+        models: Array<{ aliases: string[]; patterns: string[] }>;
+      }>;
+    };
+    return payload.tasks;
+  });
+  const aliasOwner = tasks.find((task) =>
+    task.models.some((model) => model.aliases.length > 0),
+  );
+  const patternOwners = tasks.flatMap((task) =>
+    task.models.flatMap((model) =>
+      model.patterns.map((pattern) => ({ taskId: task.id, pattern })),
+    ),
+  );
+  const patternOwner = patternOwners.sort(
+    (left, right) =>
+      right.pattern.replaceAll("*", "").length -
+      left.pattern.replaceAll("*", "").length,
+  )[0];
+
+  expect(aliasOwner).toBeDefined();
+  await page.getByTestId("task").selectOption(aliasOwner!.id);
+  const alias = aliasOwner!.models.find((model) => model.aliases.length > 0)!
+    .aliases[0];
+  await page.getByTestId("model").fill(alias);
+  await page.getByTestId("model").press("Enter");
+  await expect(page.getByTestId("model")).toHaveValue(alias);
+  await expect(page.getByTestId("model")).toHaveAttribute(
+    "aria-invalid",
+    "false",
+  );
+
+  expect(patternOwner).toBeDefined();
+  await page.getByTestId("task").selectOption(patternOwner.taskId);
+  const wildcardSelector = patternOwner.pattern.replaceAll("*", "custom");
+  await page.getByTestId("model").fill(wildcardSelector);
+  await page.getByTestId("model").press("Enter");
+  await expect(page.getByTestId("model")).toHaveValue(wildcardSelector);
+  await expect(page.getByTestId("model")).toHaveAttribute(
+    "aria-invalid",
+    "false",
+  );
+
+  await page.getByTestId("model").fill("unadvertisedselector");
+  await page.getByTestId("model").press("Enter");
+  await expect(page.getByTestId("model")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.getByRole("alert")).toContainText("not advertised");
 });
 
 test("shows execution controls only for the selected workflow", async ({

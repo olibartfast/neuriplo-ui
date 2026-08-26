@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NeuriploCapabilities } from "../src/contract.js";
-import { missingRequirements, resolveSelection } from "../src/selection.js";
+import {
+  findModelForSelector,
+  findTaskModelForSelector,
+  missingRequirements,
+  modelSelectorPatterns,
+  modelSelectorSuggestions,
+  resolveSelection,
+} from "../src/selection.js";
 
 const capabilities: NeuriploCapabilities = {
   schema_version: 1,
@@ -42,8 +49,8 @@ const capabilities: NeuriploCapabilities = {
       models: [
         {
           id: "yolo26",
-          aliases: [],
-          patterns: [],
+          aliases: ["yolov10"],
+          patterns: ["yolo*"],
           parameters: { required: [], optional: [] },
         },
         {
@@ -91,6 +98,63 @@ test("drops a model that the newly selected task does not offer", () => {
   });
 
   assert.equal(selection.modelId, "owlv2");
+});
+
+test("resolves advertised aliases and wildcard selectors", () => {
+  const alias = resolveSelection(capabilities, {
+    taskId: "object_detection",
+    modelId: "YOLO-V10",
+  });
+  assert.equal(alias.selection.modelId, "YOLO-V10");
+  assert.equal(alias.model.id, "yolo26");
+
+  const wildcard = resolveSelection(capabilities, {
+    taskId: "object_detection",
+    modelId: "yolo_v8",
+  });
+  assert.equal(wildcard.selection.modelId, "yolo_v8");
+  assert.equal(wildcard.model.id, "yolo26");
+});
+
+test("exposes concrete suggestions separately from wildcard families", () => {
+  const models = capabilities.tasks[0].models;
+
+  assert.deepEqual(modelSelectorSuggestions(models), [
+    "yolo26",
+    "yolov10",
+    "rtdetr",
+  ]);
+  assert.deepEqual(modelSelectorPatterns(models), ["yolo*"]);
+  assert.equal(findModelForSelector(models, " YOLO-11 ")?.id, "yolo26");
+  assert.equal(findModelForSelector(models, "owlv2"), undefined);
+});
+
+test("routes overlapping wildcard families to the most specific task", () => {
+  const tasks: NeuriploCapabilities["tasks"] = [
+    capabilities.tasks[0],
+    {
+      id: "instance_segmentation",
+      models: [
+        {
+          id: "yoloseg",
+          aliases: [],
+          patterns: ["yolo*seg*"],
+          parameters: { required: [], optional: [] },
+        },
+      ],
+      sources: { types: ["image"], min_items: 1, max_items: 1 },
+      parameters: { required: [], optional: [] },
+    },
+  ];
+
+  assert.equal(
+    findTaskModelForSelector(tasks, "yolo26-seg")?.task.id,
+    "instance_segmentation",
+  );
+  assert.equal(
+    findTaskModelForSelector(tasks, "yolo11")?.task.id,
+    "object_detection",
+  );
 });
 
 test("drops a source type the selected task does not support", () => {

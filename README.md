@@ -45,8 +45,10 @@ and client-server workflow availability authoritative in the compiled binary.
 The frontend renders every choice from that response. Tasks, models, execution
 workflows, local backends, protocols, transports, source types, and the whole
 advanced-parameter form are derived from the contract, so a new task or backend
-in `neuriplo-infer` appears in the UI without a frontend change. `npm run dev`
-proxies `/api` to the adapter; override the target with `NEURIPLO_UI_API`.
+in `neuriplo-infer` appears in the UI without a frontend change. Model IDs and
+aliases are offered as suggestions, while custom model names are validated
+against the advertised wildcard families. `npm run dev` proxies `/api` to the
+adapter; override the target with `NEURIPLO_UI_API`.
 
 Run the build and tests with:
 

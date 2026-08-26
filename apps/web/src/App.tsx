@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import {
   CapabilitiesFetchError,
   fetchCapabilities,
@@ -7,7 +7,10 @@ import {
   type NeuriploCapabilities,
 } from "./contract.js";
 import {
+  findTaskModelForSelector,
   missingRequirements,
+  modelSelectorPatterns,
+  modelSelectorSuggestions,
   resolveSelection,
   type ActiveParameter,
   type Selection,
@@ -101,6 +104,7 @@ function Configurator({
     [capabilities, desired],
   );
   const { selection, task, workflow, protocol, parameters } = resolved;
+  const [modelSelectorValid, setModelSelectorValid] = useState(true);
 
   // Keep the clamped selection as the next starting point, so switching task
   // carries over whatever remains compatible.
@@ -111,7 +115,10 @@ function Configurator({
     update({ parameters: { ...selection.parameters, [id]: value } });
 
   const workflows = capabilities.execution.workflows;
-  const missing = missingRequirements(resolved);
+  const missing = [
+    ...(!modelSelectorValid ? ["model"] : []),
+    ...missingRequirements(resolved),
+  ];
   const required = parameters.filter((parameter) => parameter.required);
   const optional = parameters.filter((parameter) => !parameter.required);
 
@@ -124,15 +131,19 @@ function Configurator({
             testId="task"
             value={selection.taskId}
             options={capabilities.tasks.map((entry) => entry.id)}
-            onChange={(taskId) => update({ taskId })}
+            onChange={(taskId) => {
+              setModelSelectorValid(true);
+              update({ taskId });
+            }}
           />
-          <Choice
-            label="Model"
-            testId="model"
+          <ModelChoice
+            key={task.id}
             value={selection.modelId}
-            options={task.models.map((entry) => entry.id)}
+            taskId={task.id}
+            tasks={capabilities.tasks}
+            models={task.models}
             onChange={(modelId) => update({ modelId })}
-            verbatim
+            onValidityChange={setModelSelectorValid}
           />
           {workflows.length > 1 && (
             <Choice
@@ -223,6 +234,88 @@ function Configurator({
         </p>
       </section>
     </>
+  );
+}
+
+function ModelChoice({
+  value,
+  taskId,
+  tasks,
+  models,
+  onChange,
+  onValidityChange,
+}: {
+  value: string;
+  taskId: string;
+  tasks: NeuriploCapabilities["tasks"];
+  models: NeuriploCapabilities["tasks"][number]["models"];
+  onChange: (value: string) => void;
+  onValidityChange: (valid: boolean) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+  const suggestions = modelSelectorSuggestions(models);
+  const patterns = modelSelectorPatterns(models);
+  const listId = useId();
+
+  const commit = () => {
+    const selector = draft.trim();
+    const valid = findTaskModelForSelector(tasks, selector)?.task.id === taskId;
+    setInvalid(!valid);
+    onValidityChange(valid);
+    if (valid) {
+      setDraft(selector);
+      onChange(selector);
+    }
+  };
+
+  const reset = () => {
+    setDraft(value);
+    setInvalid(false);
+    onValidityChange(true);
+  };
+
+  return (
+    <label>
+      <span>Model</span>
+      <input
+        data-testid="model"
+        type="text"
+        list={listId}
+        value={draft}
+        aria-invalid={invalid}
+        aria-describedby={patterns.length > 0 ? `${listId}-patterns` : undefined}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setInvalid(false);
+          onValidityChange(false);
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            commit();
+          } else if (event.key === "Escape") {
+            reset();
+          }
+        }}
+      />
+      <datalist id={listId} data-testid="model-suggestions">
+        {suggestions.map((selector) => (
+          <option key={selector} value={selector} />
+        ))}
+      </datalist>
+      {patterns.length > 0 && (
+        <small id={`${listId}-patterns`} className="flag">
+          Accepted families: {patterns.join(", ")}
+        </small>
+      )}
+      {invalid && (
+        <small className="field-error" role="alert">
+          This selector is not advertised for the selected task.
+        </small>
+      )}
+    </label>
   );
 }
 
