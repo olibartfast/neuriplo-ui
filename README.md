@@ -103,6 +103,7 @@ npm test
 - [Mission](specs/mission.md)
 - [Tech stack](specs/tech-stack.md)
 - [Roadmap](specs/roadmap.md)
+- [Phase 4 results and diagnostics plan](specs/phase-4-results-diagnostics.md)
 
 ## Status
 
@@ -113,4 +114,7 @@ their artifacts. Phase 3 is implemented on top of them except for narrowing
 local backends per model, which needs the contract to advertise that first.
 
 Phase 4 is next: the run response already carries the command, the logs, the
-timings, and the parsed result, so what remains is surfacing them.
+whole-process wall time, and the parsed result. The implementation plan first
+surfaces those existing fields, then adds per-stage metrics and typed failure
+attribution only after `neuriplo-infer` publishes them through a versioned
+machine-readable contract.
