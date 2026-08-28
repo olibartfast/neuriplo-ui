@@ -56,6 +56,23 @@ artifacts the run produced, and the parsed JSON result when the run emitted one.
 A run that started and failed comes back as `200` with `status: "failed"`;
 `4xx`/`5xx` means the adapter could not run anything at all.
 
+A finished run is presented as a terminal report: task, model, execution,
+adapter-observed wall time, exit code, signal or timeout state, and run id,
+followed by the exact command, the structured result when there is one,
+the artifacts, and collapsible stdout and stderr. The command is rendered from
+the argument array the adapter actually spawned and quoted for a POSIX shell,
+so copying it reproduces the run outside the browser. On a failure stderr opens
+by default, because that is where `neuriplo-infer` explains itself.
+
+Two labels are deliberate. The reported duration is **wall time for the whole
+process** — startup, model load, inference, rendering, and shutdown — and is
+never called inference latency. A `null` structured result is an expected
+state rather than a parse failure: the binary only prints JSON where it
+advertises `--output_format`, and communicates most predictions through the
+rendered artifact instead. Per-stage latency, throughput, and typed failure
+stages wait for a versioned producer contract rather than being scraped out of
+human-readable logs.
+
 Each run gets a private working directory, because `neuriplo-infer` writes its
 rendered output relative to the current directory. That is what makes artifacts
 safe to serve: everything inside the directory belongs to that run and nothing
@@ -113,8 +130,13 @@ adapter runs real inference from the browser and returns structured results with
 their artifacts. Phase 3 is implemented on top of them except for narrowing
 local backends per model, which needs the contract to advertise that first.
 
-Phase 4 is next: the run response already carries the command, the logs, the
-whole-process wall time, and the parsed result. The implementation plan first
-surfaces those existing fields, then adds per-stage metrics and typed failure
-attribution only after `neuriplo-infer` publishes them through a versioned
-machine-readable contract.
+Phase 4 Slice A is implemented: a terminal run now shows its structured result,
+its reproducible command, its wall time, its artifacts, and both log streams,
+and a rejected request stays visibly distinct from a pipeline that ran and
+failed. Slice B — per-stage metrics, throughput, and typed failure stages —
+stays deliberately unimplemented until `neuriplo-infer` publishes them in a
+versioned contract, because the alternative is guessing from log text.
+
+Phase 5 is next: starting the web and server processes from the test harness,
+adding deterministic fixtures, and asserting result semantics rather than only
+a terminal state.
