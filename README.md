@@ -45,8 +45,10 @@ npm run dev:server
 
 The local adapter exposes `GET /api/capabilities`, `POST /api/runs`, and
 `GET /api/runs/:runId/artifacts/*`. It invokes
-`$NEURIPLO_INFER_BIN --capabilities` with an argument array and validates schema
-version 1 before returning the response. This keeps task, model, local backend,
+`$NEURIPLO_INFER_BIN --capabilities` with an argument array and validates the
+schema version — 1 or 2 — before returning the response. Version 2 added the
+diagnostics section described below; a version 1 binary advertises none, which
+the adapter already treats as a build that publishes no run report. This keeps task, model, local backend,
 and client-server workflow availability authoritative in the compiled binary.
 
 `POST /api/runs` checks the request against those same capabilities and then
