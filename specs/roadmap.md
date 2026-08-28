@@ -118,6 +118,8 @@ from a hard-coded list, so the following arrive automatically:
 
 Goal: make the UI useful for debugging and performance validation.
 
+Implementation contract: [Phase 4 — Results and diagnostics](phase-4-results-diagnostics.md).
+
 - [x] Render output images and other visual artifacts.
 - [ ] Show structured predictions where available.
 - [ ] Show latency and FPS/throughput metrics.
@@ -131,6 +133,12 @@ artifact's media type: anything the browser can display is shown inline, and
 everything else stays a link. The rest of this phase still needs the run
 response surfaced — it already carries the command, the logs, and the parsed
 JSON result.
+
+The current `duration_ms` is whole-process wall time, not inference latency.
+The UI-only first slice can surface that value, structured results, the exact
+command, and logs immediately. Per-stage latency/FPS and reliable failure-stage
+attribution remain blocked on a versioned machine-readable producer contract;
+Phase 4 must not infer them from human logs.
 
 ## Phase 5 — Real E2E matrix
 
