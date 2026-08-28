@@ -14,6 +14,10 @@ import {
 
 test("formats durations in stable units", () => {
   assert.equal(formatDuration(0), "0 ms");
+  // Below 10 ms a whole-millisecond value would be mostly rounding error.
+  assert.equal(formatDuration(3.5), "3.5 ms");
+  assert.equal(formatDuration(0.07), "0.1 ms");
+  assert.equal(formatDuration(4), "4 ms");
   assert.equal(formatDuration(842.4), "842 ms");
   assert.equal(formatDuration(999), "999 ms");
   assert.equal(formatDuration(1000), "1.00 s");

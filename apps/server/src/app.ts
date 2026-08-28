@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import {
   CapabilitiesDiscoveryError,
   discoverCapabilities,
+  runReportContract,
   type NeuriploCapabilities,
 } from "./capabilities.js";
 import {
@@ -13,6 +14,7 @@ import {
   type DirectoryListing,
 } from "./files.js";
 import { buildRunResponse } from "./runResponse.js";
+import { readRunDiagnostics } from "./runReport.js";
 import {
   RunExecutionError,
   executeRun,
@@ -77,7 +79,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     try {
       const plan = planRun(capabilities, request.body);
       const outcome = await runInference(plan.args);
-      return buildRunResponse(plan, outcome);
+      // Diagnostics live in the run's own directory, at the path the contract
+      // advertises; a build that publishes none simply yields null.
+      const diagnostics = await readRunDiagnostics(
+        outcome.directory,
+        runReportContract(capabilities),
+      );
+      return buildRunResponse(plan, outcome, diagnostics);
     } catch (error) {
       if (error instanceof RunRequestError) {
         return reply

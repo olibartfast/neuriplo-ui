@@ -10,6 +10,23 @@ export type RunArtifact = {
   url: string;
 };
 
+/** Producer-measured timings. Every field may be absent; absent is not zero. */
+export type RunStageTimings = {
+  model_load: number | null;
+  preprocess: number | null;
+  inference: number | null;
+  postprocess: number | null;
+  render: number | null;
+};
+
+export type RunMetrics = {
+  wall_time_ms: number | null;
+  samples: number | null;
+  frames: number | null;
+  throughput_per_second: number | null;
+  stages_ms: RunStageTimings;
+};
+
 export type RunResult = {
   status: "success" | "failed";
   run_id: string;
@@ -29,9 +46,12 @@ export type RunResult = {
   duration_ms: number;
   artifacts: RunArtifact[];
   result: unknown;
+  /** Null unless the binary publishes a run report; never synthesized. */
+  metrics: RunMetrics | null;
   stdout: string;
   stderr: string;
-  error: { code: string; message: string } | null;
+  /** `stage` is the producer's own attribution, absent when it gave none. */
+  error: { code: string; message: string; stage?: string | null } | null;
 };
 
 export type RunRequestBody = {

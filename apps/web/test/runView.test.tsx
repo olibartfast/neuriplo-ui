@@ -34,6 +34,7 @@ const baseRun: RunResult = {
   duration_ms: 1234,
   artifacts: [],
   result: null,
+  metrics: null,
   stdout: "",
   stderr: "",
   error: null,
@@ -208,6 +209,100 @@ test("labels empty and truncated log streams", () => {
     stdout: "line\n[output truncated at 1048576 bytes]",
   });
   assert.match(truncated, /\[output truncated at 1048576 bytes\]/);
+});
+
+test("shows producer metrics as a separate measurement from wall time", () => {
+  const markup = done({
+    duration_ms: 1234,
+    metrics: {
+      wall_time_ms: 812.5,
+      samples: 1,
+      frames: null,
+      throughput_per_second: 4,
+      stages_ms: {
+        model_load: 500,
+        preprocess: 3.5,
+        inference: 250,
+        postprocess: 1.5,
+        render: 40,
+      },
+    },
+  });
+
+  assert.match(markup, /Producer metrics/);
+  assert.match(markup, /Producer wall time/);
+  // The adapter's process wall time and the producer's own both appear, and
+  // neither is presented as the other.
+  assert.match(markup, /1\.23 s/);
+  assert.match(markup, /813 ms/);
+  assert.match(markup, /Model Load/);
+  assert.match(markup, /250 ms/);
+  assert.match(markup, /3\.5 ms/);
+  assert.match(markup, /4\.00 \/s/);
+  assert.match(markup, /data-testid="metric-samples"[^>]*>1</);
+});
+
+test("omits metrics the producer did not measure rather than showing zeros", () => {
+  const markup = done({
+    status: "failed",
+    exit_code: 1,
+    metrics: {
+      wall_time_ms: 546.9,
+      samples: 0,
+      frames: null,
+      throughput_per_second: null,
+      stages_ms: {
+        model_load: 546.7,
+        preprocess: null,
+        inference: null,
+        postprocess: null,
+        render: null,
+      },
+    },
+  });
+
+  assert.match(markup, /Model Load/);
+  // Nothing inferred, nothing zeroed: unmeasured stages have no row at all.
+  assert.doesNotMatch(markup, /Inference/);
+  assert.doesNotMatch(markup, /Throughput/);
+  assert.doesNotMatch(markup, /Frames/);
+  assert.match(markup, /data-testid="metric-samples"[^>]*>0</);
+});
+
+test("shows no metrics section when the build publishes none", () => {
+  const markup = done({ metrics: null });
+
+  assert.doesNotMatch(markup, /Producer metrics/);
+  assert.doesNotMatch(markup, /data-testid="metrics"/);
+  // The adapter-observed wall time is unaffected by a missing run report.
+  assert.match(markup, /Wall time \(whole process\)/);
+});
+
+test("labels a failure with the stage the producer attributed it to", () => {
+  const markup = done({
+    status: "failed",
+    exit_code: 1,
+    error: {
+      code: "run_failed",
+      message: "could not open weights",
+      stage: "model_load",
+    },
+  });
+
+  assert.match(markup, /data-testid="run-error-stage"/);
+  assert.match(markup, /Model Load/);
+  assert.match(markup, /could not open weights/);
+});
+
+test("shows no stage label when the producer attributed none", () => {
+  const markup = done({
+    status: "failed",
+    exit_code: 1,
+    error: { code: "run_failed", message: "it broke", stage: null },
+  });
+
+  assert.doesNotMatch(markup, /data-testid="run-error-stage"/);
+  assert.match(markup, /it broke/);
 });
 
 test("reports idle and running states without inventing a result", () => {

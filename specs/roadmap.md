@@ -122,10 +122,10 @@ Implementation contract: [Phase 4 — Results and diagnostics](phase-4-results-d
 
 - [x] Render output images and other visual artifacts.
 - [x] Show structured predictions where available.
-- [ ] Show latency and FPS/throughput metrics.
+- [x] Show latency and FPS/throughput metrics.
 - [x] Show command arguments in a reproducible form.
 - [x] Show stdout/stderr in a collapsible log view.
-- [ ] Distinguish configuration, model-load, inference, and postprocess failures.
+- [x] Distinguish configuration, model-load, inference, and postprocess failures.
 - [x] Allow copying a reproducible CLI command.
 
 Artifact rendering landed with Phase 2 because the runner already reports each
@@ -149,10 +149,27 @@ Three properties are load-bearing rather than cosmetic:
 - a null `result` omits the section instead of reporting a parse failure, since
   the binary only prints JSON where it advertises `--output_format`.
 
-The two open items are the ones Slice B blocks on. Per-stage latency, FPS and
-throughput, and failure attribution to configuration, model load, inference, or
-postprocess all require a versioned machine-readable producer contract; Phase 4
-must not infer them from human logs.
+Slice B is complete, and it started where it had to: in `neuriplo-infer`. Every
+run now writes a versioned report to the path `--capabilities` advertises under
+`diagnostics.run_report`, carrying per-stage timings, sample and frame counts,
+throughput, and the stage a failure is attributed to. The adapter reads that
+document from the run's own directory, validates it, and passes it through; the
+UI shows producer metrics as a section separate from adapter wall time, and
+labels a failure with the producer's stage.
+
+Nothing here is inferred, which is the whole point:
+
+- a stage the producer did not measure is `null` and gets no row, so the UI
+  never renders a measurement nobody took;
+- throughput appears only when the producer supplied both a processed count
+  and the inference time it belongs to;
+- a report from an unadvertised schema version is dropped rather than
+  half-read, and a build that publishes no report simply shows no metrics;
+- `unknown` is treated as the producer declining to attribute the failure, so
+  no stage label is shown at all.
+
+Two adapter-owned outcomes stay separate from producer stages: a timeout and a
+termination are the adapter's own verdicts about a run it stopped.
 
 ## Phase 5 — Real E2E matrix
 
