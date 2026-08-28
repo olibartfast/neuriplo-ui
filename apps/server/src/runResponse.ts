@@ -117,11 +117,16 @@ function failureFor(outcome: RunOutcome): { code: string; message: string } {
   };
 }
 
+/**
+ * The producer's own last word, not a classification of it. glog wraps a long
+ * message onto continuation lines prefixed with ">", so those are skipped:
+ * they are the tail of an earlier line rather than a message of their own.
+ */
 function lastMeaningfulLine(stderr: string): string | null {
   const lines = stderr
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .filter((line) => line.length > 0 && !line.startsWith(">"));
   const last = lines.at(-1);
   return last ? last.slice(0, 500) : null;
 }

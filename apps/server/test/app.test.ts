@@ -217,6 +217,36 @@ test("POST /api/runs reports a failed pipeline as a completed run", async (conte
   assert.match(response.json().error.message, /Weights file/);
 });
 
+test("POST /api/runs reports the failing line, not a glog continuation", async (context) => {
+  const app = buildServer({
+    loadCapabilities: async () => fixture,
+    runInference: async () =>
+      outcomeFor({
+        exitCode: 1,
+        // glog wraps a long message onto ">" continuation lines, which say
+        // nothing on their own.
+        stderr: [
+          "I0000 Running using OpenCV DNN runtime",
+          "E0000 Error: OpenCV(4.10.0) onnx_importer.cpp:1057: error in 'handleNode'",
+          "> Node [Floor@ai.onnx]:(onnx_node!/model.11/Floor) parse error",
+          ">",
+          "",
+        ].join("\n"),
+      }),
+    logger: false,
+  });
+  context.after(() => app.close());
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: runBody,
+  });
+
+  assert.equal(response.json().status, "failed");
+  assert.match(response.json().error.message, /Error: OpenCV/);
+});
+
 test("POST /api/runs rejects a configuration the contract forbids", async (context) => {
   const app = buildServer({
     loadCapabilities: async () => fixture,

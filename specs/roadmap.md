@@ -121,24 +121,38 @@ Goal: make the UI useful for debugging and performance validation.
 Implementation contract: [Phase 4 — Results and diagnostics](phase-4-results-diagnostics.md).
 
 - [x] Render output images and other visual artifacts.
-- [ ] Show structured predictions where available.
+- [x] Show structured predictions where available.
 - [ ] Show latency and FPS/throughput metrics.
-- [ ] Show command arguments in a reproducible form.
-- [ ] Show stdout/stderr in a collapsible log view.
+- [x] Show command arguments in a reproducible form.
+- [x] Show stdout/stderr in a collapsible log view.
 - [ ] Distinguish configuration, model-load, inference, and postprocess failures.
-- [ ] Allow copying a reproducible CLI command.
+- [x] Allow copying a reproducible CLI command.
 
 Artifact rendering landed with Phase 2 because the runner already reports each
 artifact's media type: anything the browser can display is shown inline, and
-everything else stays a link. The rest of this phase still needs the run
-response surfaced — it already carries the command, the logs, and the parsed
-JSON result.
+everything else stays a link.
 
-The current `duration_ms` is whole-process wall time, not inference latency.
-The UI-only first slice can surface that value, structured results, the exact
-command, and logs immediately. Per-stage latency/FPS and reliable failure-stage
-attribution remain blocked on a versioned machine-readable producer contract;
-Phase 4 must not infer them from human logs.
+Slice A is complete. A terminal run is now a report rather than a summary line:
+a header with task, model, execution, wall time, exit code, signal or timeout
+state and run id; the exact command with a copy control; the structured result
+when the binary emitted one; the artifacts; and collapsible stdout and stderr
+with stderr opened on a failure. Adapter rejection stays a separate state that
+never claims a process ran.
+
+Three properties are load-bearing rather than cosmetic:
+
+- the command is rendered from the argument array the adapter spawned and
+  quoted for a POSIX shell, never rebuilt from the form, so copying it
+  reproduces the run;
+- `duration_ms` is whole-process wall time and is labelled as such, because
+  calling it inference latency would be false;
+- a null `result` omits the section instead of reporting a parse failure, since
+  the binary only prints JSON where it advertises `--output_format`.
+
+The two open items are the ones Slice B blocks on. Per-stage latency, FPS and
+throughput, and failure attribution to configuration, model load, inference, or
+postprocess all require a versioned machine-readable producer contract; Phase 4
+must not infer them from human logs.
 
 ## Phase 5 — Real E2E matrix
 
