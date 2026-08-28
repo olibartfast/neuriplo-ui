@@ -247,6 +247,134 @@ test("POST /api/runs reports the failing line, not a glog continuation", async (
   assert.match(response.json().error.message, /Error: OpenCV/);
 });
 
+test("POST /api/runs surfaces producer metrics and the failing stage", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "neuriplo-run-diagnostics-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "data", "output"), { recursive: true });
+  await writeFile(
+    join(directory, "data", "output", "run_report.json"),
+    JSON.stringify({
+      schema_version: 1,
+      status: "failed",
+      stage: "model_load",
+      metrics: {
+        wall_time_ms: 546.9,
+        samples: 0,
+        frames: null,
+        throughput_per_second: null,
+        stages_ms: { model_load: 546.7 },
+      },
+      error: { stage: "model_load", message: "could not open weights" },
+    }),
+  );
+
+  const app = buildServer({
+    loadCapabilities: async () => ({
+      ...fixture,
+      diagnostics: {
+        run_report: {
+          schema_version: 1,
+          path: "data/output/run_report.json",
+          stages: ["model_load", "inference", "unknown"],
+        },
+      },
+    }),
+    runInference: async () =>
+      outcomeFor({
+        directory,
+        exitCode: 1,
+        stderr: "E0000 something the last line does not explain\n",
+      }),
+    logger: false,
+  });
+  context.after(() => app.close());
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: runBody,
+  });
+
+  const body = response.json();
+  assert.equal(body.status, "failed");
+  assert.equal(body.error.stage, "model_load");
+  // The producer's own message wins over the adapter's last-line heuristic.
+  assert.equal(body.error.message, "could not open weights");
+  assert.equal(body.metrics.stages_ms.model_load, 546.7);
+  assert.equal(body.metrics.stages_ms.inference, null);
+  // Adapter-observed wall time stays separate from the producer's own.
+  assert.equal(body.duration_ms, 12.7);
+  assert.equal(body.metrics.wall_time_ms, 546.9);
+});
+
+test("POST /api/runs carries no metrics when the build publishes none", async (context) => {
+  const app = buildServer({
+    loadCapabilities: async () => fixture,
+    runInference: async () =>
+      outcomeFor({ exitCode: 1, stderr: "E0000 weights missing\n" }),
+    logger: false,
+  });
+  context.after(() => app.close());
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: runBody,
+  });
+
+  const body = response.json();
+  assert.equal(body.metrics, null);
+  // No stage was published, so none is claimed, and the message falls back to
+  // the producer's log.
+  assert.equal(body.error.stage, null);
+  assert.match(body.error.message, /weights missing/);
+});
+
+test("POST /api/runs does not report an unknown stage as attribution", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "neuriplo-run-unknown-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "data", "output"), { recursive: true });
+  await writeFile(
+    join(directory, "data", "output", "run_report.json"),
+    JSON.stringify({
+      schema_version: 1,
+      status: "failed",
+      stage: "unknown",
+      metrics: null,
+      error: { stage: "unknown", message: null },
+    }),
+  );
+
+  const app = buildServer({
+    loadCapabilities: async () => ({
+      ...fixture,
+      diagnostics: {
+        run_report: {
+          schema_version: 1,
+          path: "data/output/run_report.json",
+          stages: ["unknown"],
+        },
+      },
+    }),
+    runInference: async () =>
+      outcomeFor({ directory, exitCode: 1, stderr: "E0000 it broke\n" }),
+    logger: false,
+  });
+  context.after(() => app.close());
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/api/runs",
+    payload: runBody,
+  });
+
+  const body = response.json();
+  // "unknown" is the producer admitting it could not attribute the failure, so
+  // showing it as a stage would be worse than showing nothing.
+  assert.equal(body.error.stage, null);
+  assert.match(body.error.message, /it broke/);
+});
+
 test("POST /api/runs rejects a configuration the contract forbids", async (context) => {
   const app = buildServer({
     loadCapabilities: async () => fixture,

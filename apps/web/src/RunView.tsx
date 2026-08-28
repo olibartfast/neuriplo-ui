@@ -8,6 +8,8 @@ import {
   formatCommand,
   formatDuration,
   formatJson,
+  labelForStage,
+  metricRows,
   summarizeOutcome,
   type CopyState,
 } from "./results.js";
@@ -84,7 +86,18 @@ export function RunPanel({
       aria-label="Run result"
     >
       <span data-testid="run-status">{failed ? "Failed" : "Succeeded"}</span>
-      {run.error && <p data-testid="run-error">{run.error.message}</p>}
+      {run.error && (
+        <p data-testid="run-error">
+          {/* The stage is the producer's own attribution; it is shown as a
+              label beside the message, never derived from it. */}
+          {run.error.stage && (
+            <strong data-testid="run-error-stage">
+              {labelForStage(run.error.stage)}:{" "}
+            </strong>
+          )}
+          {run.error.message}
+        </p>
+      )}
 
       <dl className="run-header" data-testid="run-header">
         <Fact label="Task" value={run.task} />
@@ -108,6 +121,7 @@ export function RunPanel({
         {summarizeOutcome(run).join(" · ")}
       </p>
 
+      <Metrics metrics={run.metrics} />
       <CommandBlock command={run.command} />
       {run.result !== null && run.result !== undefined && (
         <StructuredResult result={run.result} />
@@ -133,6 +147,36 @@ function Fact({
       <dt>{label}</dt>
       <dd data-testid={testId}>{value}</dd>
     </div>
+  );
+}
+
+/**
+ * Producer-measured timings, which are a different measurement from the
+ * adapter's wall time in the header: this one is measured inside the binary
+ * and broken down by stage. A build that publishes none renders nothing at
+ * all, so a missing metric is never shown as a zero.
+ */
+function Metrics({ metrics }: { metrics: RunResult["metrics"] }) {
+  const rows = metricRows(metrics);
+  if (rows.length === 0) return null;
+
+  return (
+    <section className="result-section" aria-label="Metrics">
+      <h2>Producer metrics</h2>
+      <dl className="run-header" data-testid="metrics">
+        {rows.map((row) => (
+          <div className="fact" key={row.label}>
+            <dt>{row.label}</dt>
+            <dd data-testid={`metric-${row.label.toLowerCase().replace(/ /g, "-")}`}>
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="hint">
+        Measured by neuriplo-infer. Stage values are sums over the run.
+      </p>
+    </section>
   );
 }
 
