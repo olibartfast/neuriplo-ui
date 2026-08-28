@@ -37,9 +37,14 @@ test("renders a configurator driven by discovered capabilities", async ({
   expect((await optionsOf(page, "task")).length).toBeGreaterThan(0);
   expect((await optionsOf(page, "model")).length).toBeGreaterThan(0);
   await expect(page.getByTestId("source")).toBeVisible();
+  await expect(page.getByTestId("source-path-0")).toBeVisible();
   await expect(page.getByTestId("run-status")).toHaveText("Idle");
-  await expect(page.getByTestId("run")).toBeDisabled();
   await expect(page.getByTestId("producer")).toContainText("neuriplo-infer");
+
+  // Nothing has been supplied yet, so the run button must name what is
+  // missing rather than launch an incomplete configuration.
+  await expect(page.getByTestId("run")).toBeDisabled();
+  await expect(page.getByTestId("run-hint")).toContainText("Source");
 });
 
 test("narrows model choices to the selected task", async ({ page }) => {
@@ -77,6 +82,8 @@ test("accepts advertised aliases and wildcard model selectors", async ({
     };
     return payload.tasks;
   });
+  test.skip(tasks.length < 2, "contract advertises a single task");
+
   const aliasOwner = tasks.find((task) =>
     task.models.some((model) => model.aliases.length > 0),
   );
@@ -167,4 +174,113 @@ test("blocks running until required parameters are supplied", async ({
     await expect(endpoint).toBeVisible();
     await endpoint.fill("http://127.0.0.1:8000");
   }
+});
+
+test("offers one source slot per source the task accepts", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+
+  const sources = await page.evaluate(async () => {
+    const response = await fetch("/api/capabilities");
+    const payload = (await response.json()) as {
+      tasks: Array<{
+        id: string;
+        sources: { min_items: number; max_items: number };
+      }>;
+    };
+    return payload.tasks;
+  });
+
+  const multi = sources.find((task) => task.sources.min_items > 1);
+  test.skip(multi === undefined, "no task advertises multiple sources");
+
+  await page.getByTestId("task").selectOption(multi!.id);
+  for (let index = 0; index < multi!.sources.min_items; index += 1) {
+    await expect(page.getByTestId(`source-path-${index}`)).toBeVisible();
+  }
+
+  // An unbounded task must let the user add further sources.
+  if (multi!.sources.max_items < 0) {
+    await page.getByTestId("add-source").click();
+    await expect(
+      page.getByTestId(`source-path-${multi!.sources.min_items}`),
+    ).toBeVisible();
+  }
+});
+
+test("picks a source path from the adapter's filesystem", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+
+  await page.getByTestId("browse-source-path-0").click();
+  const browser = page.getByTestId("file-browser");
+  await expect(browser).toBeVisible();
+
+  // The adapter decides where browsing starts, so the dialog must show a path
+  // rather than an empty shell.
+  await expect(page.getByTestId("file-browser-path")).not.toBeEmpty();
+  await expect(page.getByTestId("file-browser-select")).toBeDisabled();
+
+  const entries = page.locator('[data-testid^="file-entry-"]');
+  await expect(entries.first()).toBeVisible();
+
+  // Directories navigate; files become the selection.
+  const file = entries.filter({ hasText: "📄" }).first();
+  if ((await file.count()) > 0) {
+    await file.click();
+    await expect(page.getByTestId("file-browser-select")).toBeEnabled();
+    await page.getByTestId("file-browser-select").click();
+    await expect(browser).toHaveCount(0);
+    await expect(page.getByTestId("source-path-0")).not.toHaveValue("");
+  } else {
+    await page.getByTestId("file-browser-cancel").click();
+    await expect(browser).toHaveCount(0);
+  }
+});
+
+test("launches a run once every requirement is supplied", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+
+  await page.getByTestId("source-path-0").fill("/tmp/neuriplo-ui-fixture");
+
+  // Required parameters have no defaults, so fill whatever the contract asks
+  // for. The values only need to be well-formed; the binary decides the rest.
+  const required = page.locator('[data-testid^="param-"]');
+  for (const control of await required.all()) {
+    const type = await control.evaluate((element) => ({
+      tag: element.tagName,
+      inputType: element.getAttribute("type"),
+    }));
+    if (type.tag === "SELECT" || type.inputType === "checkbox") continue;
+    if ((await control.inputValue()) !== "") continue;
+    await control.fill(
+      type.inputType === "number" ? "1" : "/tmp/neuriplo-ui-fixture",
+    );
+  }
+
+  const run = page.getByTestId("run");
+  await expect(run).toBeEnabled();
+  await run.click();
+
+  // The run must reach a terminal state. Which one depends on the machine's
+  // models and weights, so this asserts the wiring rather than the outcome.
+  await expect(page.getByTestId("run-status")).toHaveText(
+    /Succeeded|Failed|Rejected/,
+    { timeout: 60_000 },
+  );
+
+  // A successful run renders whatever it produced, so an image artifact must
+  // be displayed rather than only linked.
+  if ((await page.getByTestId("run-status").textContent()) !== "Succeeded") {
+    return;
+  }
+  const previews = page.locator('[data-testid^="artifact-preview-"]');
+  expect(await previews.count()).toBeGreaterThan(0);
+
+  const first = previews.first();
+  await expect(first).toBeVisible();
+  await expect
+    .poll(() => first.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
 });
