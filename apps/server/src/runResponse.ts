@@ -1,5 +1,6 @@
 import type { PlannedRun } from "./runs.js";
 import type { RunOutcome } from "./runner.js";
+import type { RunDiagnostics } from "./runReport.js";
 
 /**
  * Shapes a finished process into the run resource the UI consumes.
@@ -33,18 +34,29 @@ export type RunResponse = {
   exit_code: number | null;
   signal: string | null;
   timed_out: boolean;
+  /** Adapter-observed wall time around the whole child process. */
   duration_ms: number;
   artifacts: RunResponseArtifact[];
   /** Parsed stdout when the run emitted JSON, otherwise null. */
   result: unknown;
+  /**
+   * Producer-measured stage timings and counts, when this build publishes a
+   * run report. Null when it does not, and never synthesized by the adapter.
+   */
+  metrics: RunDiagnostics["metrics"];
   stdout: string;
   stderr: string;
-  error: { code: string; message: string } | null;
+  /**
+   * `stage` is the producer's own attribution, passed through untouched. It is
+   * null when the producer supplied none; the adapter never classifies stderr.
+   */
+  error: { code: string; message: string; stage?: string | null } | null;
 };
 
 export function buildRunResponse(
   plan: PlannedRun,
   outcome: RunOutcome,
+  diagnostics: RunDiagnostics | null = null,
 ): RunResponse {
   const succeeded = !outcome.timedOut && outcome.exitCode === 0;
 
@@ -70,9 +82,10 @@ export function buildRunResponse(
       url: artifactUrl(outcome.runId, artifact.name),
     })),
     result: parseStructuredResult(outcome.stdout),
+    metrics: diagnostics?.metrics ?? null,
     stdout: outcome.stdout,
     stderr: outcome.stderr,
-    error: succeeded ? null : failureFor(outcome),
+    error: succeeded ? null : failureFor(outcome, diagnostics),
   };
 }
 
@@ -96,7 +109,12 @@ function parseStructuredResult(stdout: string): unknown {
   }
 }
 
-function failureFor(outcome: RunOutcome): { code: string; message: string } {
+function failureFor(
+  outcome: RunOutcome,
+  diagnostics: RunDiagnostics | null,
+): { code: string; message: string; stage?: string | null } {
+  // A timeout and a kill are the adapter's own verdicts: it stopped the run,
+  // so whatever stage the producer had reached is not why the run ended.
   if (outcome.timedOut) {
     return {
       code: "timeout",
@@ -107,14 +125,25 @@ function failureFor(outcome: RunOutcome): { code: string; message: string } {
     return {
       code: "terminated",
       message: `neuriplo-infer was terminated by ${outcome.signal}`,
+      stage: producerStage(diagnostics),
     };
   }
   return {
     code: "run_failed",
+    // The producer's own message when it recorded one, since it knows what
+    // failed better than the last line of its log does.
     message:
+      diagnostics?.error?.message ??
       lastMeaningfulLine(outcome.stderr) ??
       `neuriplo-infer exited with code ${outcome.exitCode}`,
+    stage: producerStage(diagnostics),
   };
+}
+
+/** The producer's attribution, or null. `unknown` is an answer, not a stage. */
+function producerStage(diagnostics: RunDiagnostics | null): string | null {
+  const stage = diagnostics?.error?.stage ?? diagnostics?.stage ?? null;
+  return stage === null || stage === "unknown" ? null : stage;
 }
 
 /**

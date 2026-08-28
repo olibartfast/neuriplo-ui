@@ -57,14 +57,34 @@ export type CapabilityWorkflow = {
   parameters: CapabilityParameterSelection;
 };
 
+/**
+ * Where a run leaves its machine-readable diagnostics. The producer advertises
+ * the path rather than the adapter assuming one, so a build that does not
+ * publish a report simply omits the section and nothing downstream changes.
+ */
+export type CapabilityRunReport = {
+  schema_version: number;
+  /** Relative to the working directory a run executes in. */
+  path: string;
+  stages: string[];
+};
+
 export type NeuriploCapabilities = {
   schema_version: 1;
   producer: { name: "neuriplo-infer"; version: string };
+  diagnostics?: { run_report?: CapabilityRunReport };
   execution: { workflows: CapabilityWorkflow[] };
   source_types: Array<{ id: string; input: string }>;
   parameters: Record<string, CapabilityParameter>;
   tasks: CapabilityTask[];
 };
+
+/** The advertised run report, or null when this build publishes none. */
+export function runReportContract(
+  capabilities: NeuriploCapabilities,
+): CapabilityRunReport | null {
+  return capabilities.diagnostics?.run_report ?? null;
+}
 
 export type CapabilitiesErrorCode =
   | "not_configured"
@@ -158,6 +178,19 @@ function assertCapabilities(
   ) {
     throw invalidResponse("Capabilities producer is invalid");
   }
+  // Diagnostics are optional: an older binary advertises none, and the run
+  // response then simply carries no metrics and no failure stage.
+  if (value.diagnostics !== undefined) {
+    if (!isRecord(value.diagnostics)) {
+      throw invalidResponse("Capabilities diagnostics are invalid");
+    }
+    if (
+      value.diagnostics.run_report !== undefined &&
+      !isRunReport(value.diagnostics.run_report)
+    ) {
+      throw invalidResponse("Capabilities run report is invalid");
+    }
+  }
   if (
     !isRecord(value.execution) ||
     !Array.isArray(value.execution.workflows) ||
@@ -207,6 +240,20 @@ function assertCapabilities(
       assertParameterReferences(model.parameters, parameterIds);
     }
   }
+}
+
+function isRunReport(value: unknown): value is CapabilityRunReport {
+  return (
+    isRecord(value) &&
+    typeof value.schema_version === "number" &&
+    typeof value.path === "string" &&
+    value.path.length > 0 &&
+    // An absolute or climbing path would let the producer point the adapter
+    // outside the run directory it is allowed to read.
+    !value.path.startsWith("/") &&
+    !value.path.split("/").includes("..") &&
+    isStringArray(value.stages)
+  );
 }
 
 function isWorkflow(value: unknown): value is CapabilityWorkflow {

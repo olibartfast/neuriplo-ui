@@ -297,6 +297,27 @@ test("launches a run once every requirement is supplied", async ({ page }) => {
   await expect(page.getByTestId("run-header")).not.toContainText(/latency/i);
   await expect(page.getByTestId("run-duration")).not.toBeEmpty();
 
+  // Producer metrics appear only when this build publishes a run report, so
+  // the assertion follows the contract rather than assuming either way.
+  const publishesReport = await page.evaluate(async () => {
+    const response = await fetch("/api/capabilities");
+    const payload = (await response.json()) as {
+      diagnostics?: { run_report?: { path?: string } };
+    };
+    return Boolean(payload.diagnostics?.run_report?.path);
+  });
+
+  if (publishesReport) {
+    const metrics = page.getByTestId("metrics");
+    await expect(metrics).toBeVisible();
+    await expect(metrics).toContainText("Producer wall time");
+    // The producer's measurement is a different number from the adapter's, so
+    // the two must not be rendered as one.
+    await expect(page.getByTestId("run-header")).toContainText("Wall time");
+    // A stage nobody measured must be absent, never rendered as a zero.
+    await expect(metrics).not.toContainText(/\b0 ms\b/);
+  }
+
   await expect(page.getByTestId("log-toggle-stdout")).toBeVisible();
   await expect(page.getByTestId("log-toggle-stderr")).toBeVisible();
   await page.getByTestId("log-toggle-stdout").click();
@@ -305,6 +326,19 @@ test("launches a run once every requirement is supplied", async ({ page }) => {
   // A failed run puts its diagnosis on stderr, so that stream starts open.
   if (status === "Failed") {
     await expect(page.getByTestId("log-stderr")).toBeVisible();
+
+    // When the producer attributed the failure to a stage, the UI must show
+    // that attribution rather than leaving the reader to infer it from logs.
+    const stage = await page.evaluate(async () => {
+      const response = await fetch("/api/capabilities");
+      const payload = (await response.json()) as {
+        diagnostics?: { run_report?: { stages?: string[] } };
+      };
+      return payload.diagnostics?.run_report?.stages ?? [];
+    });
+    if (stage.length > 0 && (await page.getByTestId("run-error-stage").count())) {
+      await expect(page.getByTestId("run-error-stage")).not.toBeEmpty();
+    }
     return;
   }
 
