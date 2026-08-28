@@ -1,6 +1,27 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+export type ParameterValueType =
+  | "boolean"
+  | "enum"
+  | "integer"
+  | "number"
+  | "path"
+  | "shape_list"
+  | "string"
+  | "string_list"
+  | "url";
+
+export type CapabilityParameter = {
+  cli_flag: string;
+  value_type: ParameterValueType;
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+  separator?: string;
+  values?: string[];
+};
+
 export type CapabilityParameterSelection = {
   required: string[];
   optional: string[];
@@ -24,10 +45,15 @@ export type CapabilityTask = {
   parameters: CapabilityParameterSelection;
 };
 
+export type CapabilityProtocol = {
+  id: string;
+  transports: string[];
+};
+
 export type CapabilityWorkflow = {
   id: "local" | "client_server";
   backends: string[];
-  protocols: Array<{ id: string; transports: string[] }>;
+  protocols: CapabilityProtocol[];
   parameters: CapabilityParameterSelection;
 };
 
@@ -36,7 +62,7 @@ export type NeuriploCapabilities = {
   producer: { name: "neuriplo-infer"; version: string };
   execution: { workflows: CapabilityWorkflow[] };
   source_types: Array<{ id: string; input: string }>;
-  parameters: Record<string, { cli_flag: string; value_type: string }>;
+  parameters: Record<string, CapabilityParameter>;
   tasks: CapabilityTask[];
 };
 
