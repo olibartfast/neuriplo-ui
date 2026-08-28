@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   CapabilitiesFetchError,
   fetchCapabilities,
@@ -7,18 +8,40 @@ import {
   type NeuriploCapabilities,
 } from "./contract.js";
 import {
+  canAddSource,
+  canRemoveSource,
   findTaskModelForSelector,
   missingRequirements,
   modelSelectorPatterns,
   modelSelectorSuggestions,
   resolveSelection,
   type ActiveParameter,
+  type ResolvedSelection,
   type Selection,
 } from "./selection.js";
+import {
+  RunFailedError,
+  startRun,
+  type RunResult,
+  type RunArtifact,
+} from "./run.js";
+import {
+  DirectoryListingError,
+  formatBytes,
+  listDirectory,
+  type DirectoryEntry,
+  type DirectoryListing,
+} from "./files.js";
 
 type DiscoveryState =
   | { status: "loading" }
   | { status: "ready"; capabilities: NeuriploCapabilities }
+  | { status: "error"; code: string; message: string };
+
+type RunState =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "done"; run: RunResult }
   | { status: "error"; code: string; message: string };
 
 export function App() {
@@ -98,6 +121,7 @@ function Configurator({
   capabilities: NeuriploCapabilities;
 }) {
   const [desired, setDesired] = useState<Partial<Selection>>({});
+  const [run, setRun] = useState<RunState>({ status: "idle" });
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -114,6 +138,13 @@ function Configurator({
   const setParameter = (id: string, value: string) =>
     update({ parameters: { ...selection.parameters, [id]: value } });
 
+  const setSource = (index: number, value: string) =>
+    update({
+      sources: selection.sources.map((source, position) =>
+        position === index ? value : source,
+      ),
+    });
+
   const workflows = capabilities.execution.workflows;
   const missing = [
     ...(!modelSelectorValid ? ["model"] : []),
@@ -121,6 +152,26 @@ function Configurator({
   ];
   const required = parameters.filter((parameter) => parameter.required);
   const optional = parameters.filter((parameter) => !parameter.required);
+
+  const launch = () => {
+    setRun({ status: "running" });
+    startRun(resolved)
+      .then((result) => setRun({ status: "done", run: result }))
+      .catch((error: unknown) => {
+        const failure =
+          error instanceof RunFailedError
+            ? error
+            : new RunFailedError(
+                "invalid_response",
+                "The adapter returned an unreadable run result.",
+              );
+        setRun({
+          status: "error",
+          code: failure.code,
+          message: failure.message,
+        });
+      });
+  };
 
   return (
     <>
@@ -193,6 +244,19 @@ function Configurator({
           />
         </div>
 
+        <SourcePaths
+          resolved={resolved}
+          onChange={setSource}
+          onAdd={() => update({ sources: [...selection.sources, ""] })}
+          onRemove={(index) =>
+            update({
+              sources: selection.sources.filter(
+                (_, position) => position !== index,
+              ),
+            })
+          }
+        />
+
         {required.length > 0 && (
           <ParameterGroup
             title={`Required for ${labelFor(selection.workflowId)}`}
@@ -215,25 +279,192 @@ function Configurator({
           </details>
         )}
 
-        <button data-testid="run" type="button" disabled>
-          Run inference
+        <button
+          data-testid="run"
+          type="button"
+          disabled={missing.length > 0 || run.status === "running"}
+          onClick={launch}
+        >
+          {run.status === "running" ? "Running…" : "Run inference"}
         </button>
         <p className="hint" data-testid="run-hint">
           {missing.length > 0
             ? `Provide ${missing.map(labelFor).join(", ")} before running.`
-            : "Runner integration is the next milestone."}
+            : "Launches neuriplo-infer through the local adapter."}
         </p>
       </section>
 
+      <RunPanel state={run} capabilities={capabilities} />
+    </>
+  );
+}
+
+function SourcePaths({
+  resolved,
+  onChange,
+  onAdd,
+  onRemove,
+}: {
+  resolved: ResolvedSelection;
+  onChange: (index: number, value: string) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  const { task, selection } = resolved;
+  const removable = canRemoveSource(task, selection.sources);
+
+  return (
+    <div className="parameters">
+      <div className="grid">
+        {selection.sources.map((source, index) => (
+          <label key={index}>
+            <span>
+              {labelFor(selection.sourceType)}
+              {selection.sources.length > 1 ? ` ${index + 1}` : ""}
+              {index < task.sources.min_items && (
+                <em className="required"> required</em>
+              )}
+            </span>
+            <PathField
+              testId={`source-path-${index}`}
+              title={`Select ${labelFor(selection.sourceType).toLowerCase()}`}
+              value={source}
+              onChange={(next) => onChange(index, next)}
+            />
+            {removable && (
+              <button
+                data-testid={`remove-source-${index}`}
+                type="button"
+                className="inline"
+                onClick={() => onRemove(index)}
+              >
+                Remove
+              </button>
+            )}
+          </label>
+        ))}
+      </div>
+      {canAddSource(task, selection.sources) && (
+        <button
+          data-testid="add-source"
+          type="button"
+          className="inline"
+          onClick={onAdd}
+        >
+          Add source
+        </button>
+      )}
+      <p className="hint">
+        Paths are read by the adapter, so they are resolved on the machine
+        running neuriplo-infer.
+      </p>
+    </div>
+  );
+}
+
+function RunPanel({
+  state,
+  capabilities,
+}: {
+  state: RunState;
+  capabilities: NeuriploCapabilities;
+}) {
+  const producer = (
+    <p className="hint" data-testid="producer">
+      neuriplo-infer {capabilities.producer.version} · schema v
+      {capabilities.schema_version}
+    </p>
+  );
+
+  if (state.status === "idle") {
+    return (
       <section className="panel empty-state" aria-label="Run result">
         <span data-testid="run-status">Idle</span>
         <p>Results, latency, logs, and generated artifacts will appear here.</p>
-        <p className="hint" data-testid="producer">
-          neuriplo-infer {capabilities.producer.version} · schema v
-          {capabilities.schema_version}
-        </p>
+        {producer}
       </section>
-    </>
+    );
+  }
+
+  if (state.status === "running") {
+    return (
+      <section className="panel empty-state" aria-label="Run result">
+        <span data-testid="run-status">Running</span>
+        <p>Waiting for neuriplo-infer to finish.</p>
+        {producer}
+      </section>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <section className="panel notice" aria-label="Run result">
+        <span data-testid="run-status">Rejected</span>
+        <p data-testid="run-error">{state.message}</p>
+        <p className="hint">The run was refused with: {state.code}</p>
+        {producer}
+      </section>
+    );
+  }
+
+  const { run } = state;
+  return (
+    <section
+      className={run.status === "success" ? "panel" : "panel notice"}
+      aria-label="Run result"
+    >
+      <span data-testid="run-status">
+        {run.status === "success" ? "Succeeded" : "Failed"}
+      </span>
+      {run.error && <p data-testid="run-error">{run.error.message}</p>}
+      <p className="hint" data-testid="run-summary">
+        exit {run.exit_code ?? "—"} · {Math.round(run.duration_ms)} ms ·{" "}
+        {run.artifacts.length} artifact
+        {run.artifacts.length === 1 ? "" : "s"}
+      </p>
+      {run.artifacts.length > 0 && <Artifacts artifacts={run.artifacts} />}
+      {producer}
+    </section>
+  );
+}
+
+function Artifacts({ artifacts }: { artifacts: RunArtifact[] }) {
+  return (
+    <ul className="artifacts" data-testid="artifacts">
+      {artifacts.map((artifact) => (
+        <li key={artifact.name}>
+          <div className="artifact-meta">
+            <a href={artifact.url} target="_blank" rel="noreferrer">
+              {artifact.name}
+            </a>
+            <small className="flag">
+              {artifact.media_type} · {artifact.bytes} B
+            </small>
+          </div>
+          {/* The adapter reports the media type, so anything the browser can
+              display is shown rather than only offered as a download. */}
+          {artifact.media_type.startsWith("image/") && (
+            <a href={artifact.url} target="_blank" rel="noreferrer">
+              <img
+                data-testid={`artifact-preview-${artifact.name}`}
+                className="artifact-preview"
+                src={artifact.url}
+                alt={`Output rendered by neuriplo-infer: ${artifact.name}`}
+                loading="lazy"
+              />
+            </a>
+          )}
+          {artifact.media_type.startsWith("video/") && (
+            <video
+              data-testid={`artifact-preview-${artifact.name}`}
+              className="artifact-preview"
+              src={artifact.url}
+              controls
+            />
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -449,6 +680,17 @@ function renderControl(
           onChange={(event) => onChange(event.target.value)}
         />
       );
+    case "path":
+      // Every parameter the contract types as a path becomes browsable, so a
+      // newly advertised path parameter gets a picker without a change here.
+      return (
+        <PathField
+          testId={testId}
+          title="Select file"
+          value={value}
+          onChange={onChange}
+        />
+      );
     default:
       return (
         <input
@@ -460,6 +702,224 @@ function renderControl(
         />
       );
   }
+}
+
+/** A path input paired with a picker that browses the adapter's filesystem. */
+function PathField({
+  testId,
+  title,
+  value,
+  onChange,
+}: {
+  testId: string;
+  title: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [browsing, setBrowsing] = useState(false);
+
+  return (
+    <>
+      <div className="path-field">
+        <input
+          data-testid={testId}
+          type="text"
+          value={value}
+          placeholder="/path/to/file"
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button
+          data-testid={`browse-${testId}`}
+          type="button"
+          className="inline"
+          onClick={() => setBrowsing(true)}
+        >
+          Browse…
+        </button>
+      </div>
+      {browsing &&
+        createPortal(
+          <FileBrowser
+            title={title}
+            startAt={value}
+            onCancel={() => setBrowsing(false)}
+            onSelect={(path) => {
+              onChange(path);
+              setBrowsing(false);
+            }}
+          />,
+          document.body,
+        )}
+    </>
+  );
+}
+
+type BrowseState =
+  | { status: "loading" }
+  | { status: "ready"; listing: DirectoryListing }
+  | { status: "error"; message: string };
+
+function FileBrowser({
+  title,
+  startAt,
+  onSelect,
+  onCancel,
+}: {
+  title: string;
+  /** A previously chosen path, so reopening resumes where it left off. */
+  startAt: string;
+  onSelect: (path: string) => void;
+  onCancel: () => void;
+}) {
+  // Undefined asks the adapter for its own starting directory rather than
+  // guessing one in the browser.
+  const [directory, setDirectory] = useState<string | undefined>(
+    startAt.trim() ? parentPath(startAt.trim()) : undefined,
+  );
+  const [state, setState] = useState<BrowseState>({ status: "loading" });
+  const [selected, setSelected] = useState<string | null>(
+    startAt.trim() || null,
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setState({ status: "loading" });
+
+    listDirectory(directory, controller.signal)
+      .then((listing) => setState({ status: "ready", listing }))
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setState({
+          status: "error",
+          message:
+            error instanceof DirectoryListingError
+              ? error.message
+              : "That directory could not be listed.",
+        });
+      });
+
+    return () => controller.abort();
+  }, [directory]);
+
+  const choose = (entry: DirectoryEntry) => {
+    if (entry.kind === "directory") {
+      setDirectory(entry.path);
+      setSelected(null);
+      return;
+    }
+    setSelected(entry.path);
+  };
+
+  return (
+    <div
+      className="browser-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <div
+        className="browser"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        data-testid="file-browser"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") onCancel();
+        }}
+      >
+        <h2>{title}</h2>
+        <p className="browser-path" data-testid="file-browser-path">
+          {state.status === "ready" ? state.listing.path : directory ?? "…"}
+        </p>
+
+        <div className="browser-list">
+          {state.status === "loading" && <p className="hint">Listing…</p>}
+          {state.status === "error" && (
+            <p className="field-error" role="alert">
+              {state.message}
+            </p>
+          )}
+          {state.status === "ready" && (
+            <>
+              {state.listing.parent !== null && (
+                <button
+                  data-testid="file-browser-up"
+                  type="button"
+                  className="browser-entry"
+                  onClick={() => {
+                    setDirectory(state.listing.parent ?? undefined);
+                    setSelected(null);
+                  }}
+                >
+                  <span>📁 ..</span>
+                </button>
+              )}
+              {state.listing.entries.map((entry) => (
+                <button
+                  key={entry.path}
+                  data-testid={`file-entry-${entry.name}`}
+                  type="button"
+                  className="browser-entry"
+                  aria-pressed={selected === entry.path}
+                  onClick={() => choose(entry)}
+                  onDoubleClick={() => {
+                    if (entry.kind === "file") onSelect(entry.path);
+                  }}
+                >
+                  <span>
+                    {entry.kind === "directory" ? "📁" : "📄"} {entry.name}
+                  </span>
+                  <small className="flag">{formatBytes(entry.bytes)}</small>
+                </button>
+              ))}
+              {state.listing.entries.length === 0 && (
+                <p className="hint">This directory is empty.</p>
+              )}
+              {state.listing.truncated && (
+                <p className="hint">
+                  Only the first {state.listing.entries.length} entries are
+                  listed.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="browser-actions">
+          <span className="flag" data-testid="file-browser-selection">
+            {selected ?? "Nothing selected"}
+          </span>
+          <span className="browser-buttons">
+            <button
+              data-testid="file-browser-cancel"
+              type="button"
+              className="inline"
+              onClick={onCancel}
+            >
+              Cancel
+            </button>
+            <button
+              data-testid="file-browser-select"
+              type="button"
+              className="inline"
+              disabled={selected === null}
+              onClick={() => selected && onSelect(selected)}
+            >
+              Select
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Directory holding a path, so reopening the picker resumes beside it. */
+function parentPath(path: string): string | undefined {
+  const index = path.replace(/\/+$/, "").lastIndexOf("/");
+  if (index < 0) return undefined;
+  return index === 0 ? "/" : path.slice(0, index);
 }
 
 function placeholderFor(definition: CapabilityParameter): string {

@@ -27,18 +27,46 @@ Goal: remove capability knowledge from the UI and make `neuriplo-infer` authorit
 
 Goal: execute one real pipeline from the browser.
 
-- [ ] Define the request schema for `POST /api/runs`.
-- [ ] Configure `NEURIPLO_INFER_BIN`.
-- [ ] Spawn `neuriplo-infer` using an argument array.
-- [ ] Support task, model, execution workflow, and source selection.
-- [ ] Require a compatible local backend and weights only for local execution.
-- [ ] Require endpoint, remote model metadata, and transport only for client-server execution.
-- [ ] Capture exit code, stdout, stderr, and wall-clock duration.
-- [ ] Parse `--output_format=json` results.
-- [ ] Normalize failures into structured API errors.
-- [ ] Expose generated artifacts safely to the browser.
+- [x] Define the request schema for `POST /api/runs`.
+- [x] Configure `NEURIPLO_INFER_BIN`.
+- [x] Spawn `neuriplo-infer` using an argument array.
+- [x] Support task, model, execution workflow, and source selection.
+- [x] Require a compatible local backend and weights only for local execution.
+- [x] Require endpoint, remote model metadata, and transport only for client-server execution.
+- [x] Capture exit code, stdout, stderr, and wall-clock duration.
+- [x] Parse `--output_format=json` results.
+- [x] Normalize failures into structured API errors.
+- [x] Expose generated artifacts safely to the browser.
 
 Milestone: run a known object-detection model against a fixture image from the UI.
+
+Every field of a run request is checked against the discovered capabilities
+before anything is spawned, so the adapter keeps no second registry. Model
+selectors are the deliberate exception: the contract advertises wildcard
+families precisely because the set is not enumerable, so a selector only has to
+match an advertised id, alias, or pattern and `neuriplo-infer` stays the final
+authority.
+
+Two consequences of the current CLI shape are worth recording:
+
+- local backends are compiled into the binary rather than chosen on the command
+  line, so a backend is validated against the workflow and echoed back but never
+  becomes an argument;
+- `--output_format` is advertised only where the binary actually emits a JSON
+  document, so `result` is populated whenever stdout parses as JSON and is null
+  otherwise. Structured predictions for the other tasks are rendered into the
+  output image, not printed, which is what Phase 4 has to work with.
+
+Runs execute in a private working directory (`NEURIPLO_UI_RUN_ROOT`, defaulting
+under the system temp directory) because the binary writes `data/output/...`
+relative to the current directory. Everything inside that directory is a run
+artifact and nothing outside it is reachable, which is what makes serving them
+to the browser safe. `NEURIPLO_UI_SOURCE_ROOT` optionally confines source paths
+the same way.
+
+A run that started and failed returns `200` with `status: "failed"`, an exit
+code, and logs; `4xx`/`5xx` is reserved for the adapter being unable to run
+anything at all.
 
 ## Phase 3 — Dynamic pipeline UI
 
@@ -49,18 +77,30 @@ Goal: make the configurator capability-driven.
 - [x] Let the user choose local or client-server execution when both are available.
 - [ ] Make local backend choices depend on model compatibility/availability.
 - [x] Show endpoint, remote model/version, and transport controls only for client-server execution.
-- [ ] Add file/image/video source selection.
+- [x] Add file/image/video source selection.
 - [x] Add task-specific advanced controls only when relevant.
 - [x] Add weights/model-path handling.
 - [x] Display validation before launching invalid configurations.
 
-Two items remain open, and both need contract support rather than UI work:
+One item remains open, and it needs contract support rather than UI work:
+backend choices currently follow the execution workflow, because the contract
+advertises backends per workflow and not per model; per-model backend
+compatibility has to be advertised before the UI can narrow the list.
 
-- backend choices currently follow the execution workflow, because the contract
-  advertises backends per workflow and not per model; per-model backend
-  compatibility has to be advertised before the UI can narrow the list;
-- source selection covers source *types* only. Choosing an actual file or
-  camera index belongs with the Phase 2 runner, which needs the path anyway.
+Source selection now covers both the type and the paths, with one input slot per
+source the task advertises (`min_items`/`max_items`, `-1` meaning unbounded).
+Paths are chosen through a picker that browses the adapter's filesystem, because
+a browser file input reports a file name and never a path while the binary needs
+a path on the adapter's machine. Every parameter the contract types as `path`
+gets that picker, so a newly advertised path parameter is browsable without a
+frontend change.
+
+A second contract gap surfaced while wiring the runner: a protocol advertises
+its `transports`, and the parameter catalog separately advertises the enum that
+becomes the actual CLI flag, with nothing linking the two. The UI pairs them by
+matching the parameter's advertised values against the protocol's transports so
+the two cannot disagree, but advertising the parameter id on the protocol would
+remove the guesswork.
 
 Advanced controls are rendered from the contract's parameter catalog rather than
 from a hard-coded list, so the following arrive automatically:
@@ -78,13 +118,19 @@ from a hard-coded list, so the following arrive automatically:
 
 Goal: make the UI useful for debugging and performance validation.
 
-- [ ] Render output images and other visual artifacts.
+- [x] Render output images and other visual artifacts.
 - [ ] Show structured predictions where available.
 - [ ] Show latency and FPS/throughput metrics.
 - [ ] Show command arguments in a reproducible form.
 - [ ] Show stdout/stderr in a collapsible log view.
 - [ ] Distinguish configuration, model-load, inference, and postprocess failures.
 - [ ] Allow copying a reproducible CLI command.
+
+Artifact rendering landed with Phase 2 because the runner already reports each
+artifact's media type: anything the browser can display is shown inline, and
+everything else stays a link. The rest of this phase still needs the run
+response surfaced — it already carries the command, the logs, and the parsed
+JSON result.
 
 ## Phase 5 — Real E2E matrix
 

@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NeuriploCapabilities } from "../src/contract.js";
 import {
+  canAddSource,
+  canRemoveSource,
+  filledSources,
   findModelForSelector,
   findTaskModelForSelector,
   missingRequirements,
@@ -9,6 +12,7 @@ import {
   modelSelectorSuggestions,
   resolveSelection,
 } from "../src/selection.js";
+import { buildRunRequest } from "../src/run.js";
 
 const capabilities: NeuriploCapabilities = {
   schema_version: 1,
@@ -223,14 +227,15 @@ test("seeds declared defaults and preserves values across changes", () => {
   ]);
 });
 
-test("reports required parameters that are still empty", () => {
+test("reports the source and required parameters that are still empty", () => {
   const resolved = resolveSelection(capabilities, {
     workflowId: "client_server",
   });
-  assert.deepEqual(missingRequirements(resolved), ["kserve_endpoint"]);
+  assert.deepEqual(missingRequirements(resolved), ["source", "kserve_endpoint"]);
 
   const filled = resolveSelection(capabilities, {
     ...resolved.selection,
+    sources: ["/fixtures/bus.jpg"],
     parameters: { kserve_endpoint: "http://127.0.0.1:8000" },
   });
   assert.deepEqual(missingRequirements(filled), []);
@@ -256,4 +261,140 @@ test("ignores parameter references missing from the catalog", () => {
     parameters.map((entry) => entry.id),
     ["weights"],
   );
+});
+
+test("offers one source slot per source the task accepts", () => {
+  const single = resolveSelection(capabilities, {});
+  assert.deepEqual(single.selection.sources, [""]);
+  assert.equal(canAddSource(single.task, single.selection.sources), false);
+  assert.equal(canRemoveSource(single.task, single.selection.sources), false);
+
+  // A second path cannot survive a task that advertises max_items: 1.
+  const clamped = resolveSelection(capabilities, {
+    sources: ["/a.png", "/b.png"],
+  });
+  assert.deepEqual(clamped.selection.sources, ["/a.png"]);
+});
+
+test("keeps the minimum number of slots for a multi-source task", () => {
+  const flow: NeuriploCapabilities = {
+    ...capabilities,
+    tasks: [
+      {
+        id: "optical_flow",
+        models: [
+          {
+            id: "raft",
+            aliases: [],
+            patterns: [],
+            parameters: { required: [], optional: [] },
+          },
+        ],
+        sources: { types: ["image"], min_items: 2, max_items: -1 },
+        parameters: { required: [], optional: [] },
+      },
+    ],
+  };
+
+  const resolved = resolveSelection(flow, {});
+  assert.deepEqual(resolved.selection.sources, ["", ""]);
+  assert.equal(canAddSource(resolved.task, resolved.selection.sources), true);
+  assert.equal(
+    canRemoveSource(resolved.task, resolved.selection.sources),
+    false,
+  );
+  assert.deepEqual(missingRequirements(resolved), ["source", "weights"]);
+
+  const partial = resolveSelection(flow, { sources: ["/a.png", ""] });
+  assert.deepEqual(missingRequirements(partial), ["source", "weights"]);
+
+  const complete = resolveSelection(flow, {
+    sources: ["/a.png", "/b.png", "/c.png"],
+    parameters: { weights: "/models/raft.onnx" },
+  });
+  assert.deepEqual(filledSources(complete), ["/a.png", "/b.png", "/c.png"]);
+  assert.deepEqual(missingRequirements(complete), []);
+  assert.equal(canRemoveSource(complete.task, complete.selection.sources), true);
+});
+
+test("binds the transport control to the parameter that carries it", () => {
+  const withTransportParameter: NeuriploCapabilities = {
+    ...capabilities,
+    parameters: {
+      ...capabilities.parameters,
+      kserve_transport: {
+        cli_flag: "kserve_transport",
+        value_type: "enum",
+        default: "grpc",
+        values: ["http", "grpc"],
+      },
+    },
+    execution: {
+      workflows: [
+        capabilities.execution.workflows[0],
+        {
+          id: "client_server",
+          backends: [],
+          protocols: [{ id: "kserve_v2", transports: ["http", "grpc"] }],
+          parameters: {
+            required: ["kserve_endpoint"],
+            optional: ["kserve_transport"],
+          },
+        },
+      ],
+    },
+  };
+
+  // The advertised default wins over "first transport advertised".
+  const resolved = resolveSelection(withTransportParameter, {
+    workflowId: "client_server",
+  });
+  assert.equal(resolved.selection.transport, "grpc");
+  assert.equal(resolved.selection.parameters.kserve_transport, "grpc");
+
+  // The parameter is not rendered twice: the transport control owns it.
+  assert.deepEqual(
+    resolved.parameters.map((entry) => entry.id),
+    ["kserve_endpoint"],
+  );
+
+  const switched = resolveSelection(withTransportParameter, {
+    ...resolved.selection,
+    transport: "http",
+  });
+  assert.equal(switched.selection.parameters.kserve_transport, "http");
+});
+
+test("builds a run request from the resolved selection", () => {
+  const resolved = resolveSelection(capabilities, {
+    workflowId: "local",
+    backend: "onnx_runtime",
+    sources: ["  /fixtures/bus.jpg  "],
+    parameters: { weights: "/models/y.onnx", use_gpu: "false" },
+  });
+
+  assert.deepEqual(buildRunRequest(resolved), {
+    task: "object_detection",
+    model: "yolo26",
+    execution: {
+      workflow: "local",
+      backend: "onnx_runtime",
+      protocol: null,
+      transport: null,
+    },
+    source: { type: "image", paths: ["/fixtures/bus.jpg"] },
+    parameters: { weights: "/models/y.onnx", use_gpu: "false" },
+  });
+});
+
+test("omits untouched optional parameters from the run request", () => {
+  const resolved = resolveSelection(capabilities, {
+    workflowId: "client_server",
+    sources: ["/fixtures/bus.jpg"],
+    parameters: { kserve_endpoint: "http://127.0.0.1:8000" },
+  });
+
+  assert.deepEqual(buildRunRequest(resolved).parameters, {
+    kserve_endpoint: "http://127.0.0.1:8000",
+  });
 });

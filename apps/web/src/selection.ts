@@ -17,6 +17,8 @@ export type Selection = {
   protocolId: string | null;
   transport: string | null;
   sourceType: string;
+  /** One entry per source slot; empty strings are unfilled slots. */
+  sources: string[];
   parameters: Record<string, string>;
 };
 
@@ -26,7 +28,11 @@ export type ResolvedSelection = {
   model: CapabilityModel;
   workflow: CapabilityWorkflow;
   protocol: CapabilityProtocol | null;
-  /** Parameters contributed by the workflow, task, and model, in that order. */
+  /**
+   * Parameters to render, in workflow/task/model order. The parameter that
+   * carries the protocol transport is excluded because the transport control
+   * already edits it.
+   */
   parameters: ActiveParameter[];
 };
 
@@ -121,21 +127,29 @@ export function resolveSelection(
     workflow.protocols.length > 0
       ? pickById(workflow.protocols, desired.protocolId)
       : null;
-  const transport = protocol
-    ? pickValue(protocol.transports, desired.transport)
-    : null;
   const sourceType =
     pickValue(task.sources.types, desired.sourceType) ??
     task.sources.types[0] ??
     "";
+  const sources = resolveSources(task, desired.sources ?? []);
 
-  const parameters = collectParameters(
-    capabilities,
-    workflow,
-    task,
-    selectedModel,
-  );
-  const values = seedParameterValues(parameters, desired.parameters ?? {});
+  const active = collectParameters(capabilities, workflow, task, selectedModel);
+  const values = seedParameterValues(active, desired.parameters ?? {});
+
+  // The transport is advertised twice: once on the protocol and once as an
+  // enum parameter that becomes the actual CLI flag. Binding them here keeps
+  // the transport control authoritative instead of letting the two disagree.
+  const transportId = transportParameterId(active, protocol);
+  let transport = protocol
+    ? pickValue(protocol.transports, desired.transport)
+    : null;
+  if (protocol && transportId) {
+    transport = pickValue(
+      protocol.transports,
+      desired.transport ?? values[transportId],
+    );
+    values[transportId] = transport ?? "";
+  }
 
   return {
     selection: {
@@ -146,14 +160,71 @@ export function resolveSelection(
       protocolId: protocol?.id ?? null,
       transport,
       sourceType,
+      sources,
       parameters: values,
     },
     task,
     model: selectedModel,
     workflow,
     protocol,
-    parameters,
+    parameters: transportId
+      ? active.filter((parameter) => parameter.id !== transportId)
+      : active,
   };
+}
+
+/**
+ * Keeps one input slot per source the task accepts: at least `min_items`, never
+ * more than `max_items` (`-1` meaning unbounded), and always at least one so
+ * an optional source can still be supplied.
+ */
+function resolveSources(task: CapabilityTask, desired: string[]): string[] {
+  const { min_items: min, max_items: max } = task.sources;
+  const limit = max < 0 ? Math.max(desired.length, min, 1) : max;
+  const sources = desired.slice(0, limit);
+  while (sources.length < Math.min(Math.max(min, 1), limit)) {
+    sources.push("");
+  }
+  return sources;
+}
+
+/** True when another source slot may be added for this task. */
+export function canAddSource(task: CapabilityTask, sources: string[]): boolean {
+  const max = task.sources.max_items;
+  return max < 0 || sources.length < max;
+}
+
+/** True when a source slot may be removed without dropping below the minimum. */
+export function canRemoveSource(
+  task: CapabilityTask,
+  sources: string[],
+): boolean {
+  return sources.length > Math.max(task.sources.min_items, 1);
+}
+
+/**
+ * The active parameter that carries the protocol transport, identified by its
+ * advertised enum values matching the protocol's transports exactly. Matching
+ * on the contract rather than on a parameter name keeps a renamed or added
+ * protocol working without a frontend change; an ambiguous match yields none.
+ */
+function transportParameterId(
+  parameters: ActiveParameter[],
+  protocol: CapabilityProtocol | null,
+): string | null {
+  if (!protocol || protocol.transports.length === 0) return null;
+
+  const wanted = fingerprint(protocol.transports);
+  const matches = parameters.filter(
+    (parameter) =>
+      parameter.definition.value_type === "enum" &&
+      fingerprint(parameter.definition.values ?? []) === wanted,
+  );
+  return matches.length === 1 ? matches[0].id : null;
+}
+
+function fingerprint(values: string[]): string {
+  return [...values].sort().join("\u0000");
 }
 
 /**
@@ -214,15 +285,28 @@ function defaultValueFor(definition: CapabilityParameter): string {
   return "";
 }
 
-/** Ids of required parameters that have no usable value yet. */
+/** Ids of requirements that have no usable value yet. */
 export function missingRequirements(resolved: ResolvedSelection): string[] {
-  return resolved.parameters
+  const missing = resolved.parameters
     .filter((parameter) => parameter.required)
     .filter(
       (parameter) =>
         resolved.selection.parameters[parameter.id]?.trim().length === 0,
     )
     .map((parameter) => parameter.id);
+
+  if (filledSources(resolved).length < resolved.task.sources.min_items) {
+    missing.unshift("source");
+  }
+
+  return missing;
+}
+
+/** Source paths the user actually supplied, in slot order. */
+export function filledSources(resolved: ResolvedSelection): string[] {
+  return resolved.selection.sources
+    .map((source) => source.trim())
+    .filter((source) => source.length > 0);
 }
 
 function pickById<T extends { id: string }>(
