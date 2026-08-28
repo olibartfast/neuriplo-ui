@@ -188,6 +188,13 @@ and a new `capabilities_schema_contract` test). On this side,
 `apps/server/src/runReport.ts` reads and validates it, `runResponse.ts` carries
 `metrics` and `error.stage`, and `RunView.tsx` renders both.
 
+Publishing it bumped the capabilities document to `schema_version` 2: the
+schema forbids unknown properties, so a new required section is breaking for a
+validating consumer in both directions. Version 1 stays published in the
+producer as `docs/capabilities.schema.v1.json`, and this adapter accepts either
+version — a version 1 binary simply advertises no report and its runs carry no
+metrics.
+
 The shape below is what shipped, with two deviations worth recording. The
 report is a file in the run directory rather than a field on stdout, because
 stdout already carries a task's own JSON result and a second document there

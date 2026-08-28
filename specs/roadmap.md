@@ -164,7 +164,9 @@ Nothing here is inferred, which is the whole point:
 - throughput appears only when the producer supplied both a processed count
   and the inference time it belongs to;
 - a report from an unadvertised schema version is dropped rather than
-  half-read, and a build that publishes no report simply shows no metrics;
+  half-read, and a build that publishes no report simply shows no metrics —
+  including a binary still advertising capabilities `schema_version` 1, which
+  predates the diagnostics section and which the adapter still accepts;
 - `unknown` is treated as the producer declining to attribute the failure, so
   no stage label is shown at all.
 
