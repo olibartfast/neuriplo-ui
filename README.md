@@ -64,14 +64,30 @@ the argument array the adapter actually spawned and quoted for a POSIX shell,
 so copying it reproduces the run outside the browser. On a failure stderr opens
 by default, because that is where `neuriplo-infer` explains itself.
 
-Two labels are deliberate. The reported duration is **wall time for the whole
-process** — startup, model load, inference, rendering, and shutdown — and is
-never called inference latency. A `null` structured result is an expected
-state rather than a parse failure: the binary only prints JSON where it
-advertises `--output_format`, and communicates most predictions through the
-rendered artifact instead. Per-stage latency, throughput, and typed failure
-stages wait for a versioned producer contract rather than being scraped out of
-human-readable logs.
+Two labels are deliberate. The duration in the run header is **wall time for
+the whole process** — startup, model load, inference, rendering, and shutdown —
+and is never called inference latency. A `null` structured result is an
+expected state rather than a parse failure: the binary only prints JSON where
+it advertises `--output_format`, and communicates most predictions through the
+rendered artifact instead.
+
+Per-stage timings and failure attribution come from the producer, never from
+its logs. When `--capabilities` advertises `diagnostics.run_report`, each run
+writes a versioned JSON report into its own working directory; the adapter
+reads it, validates it, and returns it as `metrics` plus `error.stage`. The UI
+then shows a **Producer metrics** section — model load, preprocess, inference,
+postprocess, render, sample/frame counts, throughput — separate from the
+adapter's own wall time, and labels a failure with the stage it happened in
+(`configuration`, `model_load`, `source`, `preprocess`, `inference`,
+`postprocess`, `render`).
+
+A measurement the producer did not take is shown as nothing at all: no row, no
+zero, no inferred rate. Throughput appears only when the producer supplied both
+a processed count and the inference time it belongs to; a report whose schema
+version is not the advertised one is dropped rather than half-read; and a build
+that publishes no report simply shows no metrics. A timeout or a termination
+stays an adapter verdict rather than a producer stage, because the adapter is
+what stopped the run.
 
 Each run gets a private working directory, because `neuriplo-infer` writes its
 rendered output relative to the current directory. That is what makes artifacts
@@ -130,12 +146,12 @@ adapter runs real inference from the browser and returns structured results with
 their artifacts. Phase 3 is implemented on top of them except for narrowing
 local backends per model, which needs the contract to advertise that first.
 
-Phase 4 Slice A is implemented: a terminal run now shows its structured result,
+Phase 4 is complete. Slice A made a terminal run show its structured result,
 its reproducible command, its wall time, its artifacts, and both log streams,
-and a rejected request stays visibly distinct from a pipeline that ran and
-failed. Slice B — per-stage metrics, throughput, and typed failure stages —
-stays deliberately unimplemented until `neuriplo-infer` publishes them in a
-versioned contract, because the alternative is guessing from log text.
+with a rejected request visibly distinct from a pipeline that ran and failed.
+Slice B added the producer contract it was waiting on: `neuriplo-infer` now
+publishes versioned per-stage metrics and a typed failure stage, and this
+repository consumes them. Nothing is scraped from log text.
 
 Phase 5 is next: starting the web and server processes from the test harness,
 adding deterministic fixtures, and asserting result semantics rather than only

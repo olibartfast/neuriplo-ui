@@ -2,7 +2,7 @@
 // frontend never grows a per-task result registry. Nothing here inspects the
 // meaning of a result: it formats what the adapter already reported.
 
-import type { RunResult } from "./run.js";
+import type { RunMetrics, RunResult } from "./run.js";
 
 /**
  * Adapter-observed wall time in stable units. This is the whole child process
@@ -11,6 +11,9 @@ import type { RunResult } from "./run.js";
  */
 export function formatDuration(milliseconds: number): string {
   if (!Number.isFinite(milliseconds) || milliseconds < 0) return "—";
+  // Per-stage timings are routinely single-digit milliseconds, where rounding
+  // to a whole millisecond throws away most of the measurement.
+  if (milliseconds < 10) return `${Number(milliseconds.toFixed(1))} ms`;
   if (milliseconds < 1000) return `${Math.round(milliseconds)} ms`;
   if (milliseconds < 60_000) return `${(milliseconds / 1000).toFixed(2)} s`;
   const minutes = Math.floor(milliseconds / 60_000);
@@ -123,4 +126,57 @@ export async function copyText(
       message: "The clipboard rejected the copy; select the command instead.",
     };
   }
+}
+
+/** A stage label from the producer's vocabulary, rendered for a reader. */
+export function labelForStage(stage: string): string {
+  return stage
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+export type MetricRow = { label: string; value: string };
+
+/**
+ * The producer's measurements, formatted for display.
+ *
+ * Only measured values produce a row. A build that publishes no metrics, or a
+ * run that measured nothing, yields an empty list, and the caller shows no
+ * metrics section rather than a panel of dashes.
+ */
+export function metricRows(metrics: RunMetrics | null): MetricRow[] {
+  if (!metrics) return [];
+
+  const rows: MetricRow[] = [];
+  if (metrics.wall_time_ms !== null) {
+    rows.push({
+      label: "Producer wall time",
+      value: formatDuration(metrics.wall_time_ms),
+    });
+  }
+  for (const [key, value] of Object.entries(metrics.stages_ms)) {
+    if (value === null) continue;
+    rows.push({ label: labelForStage(key), value: formatDuration(value) });
+  }
+  if (metrics.samples !== null) {
+    rows.push({ label: "Samples", value: String(metrics.samples) });
+  }
+  if (metrics.frames !== null) {
+    rows.push({ label: "Frames", value: String(metrics.frames) });
+  }
+  if (metrics.throughput_per_second !== null) {
+    // The producer defines what it counted; the unit stays generic because a
+    // sample is not always a frame.
+    rows.push({
+      label: "Throughput",
+      value: `${formatThroughput(metrics.throughput_per_second)} /s`,
+    });
+  }
+  return rows;
+}
+
+function formatThroughput(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return value >= 100 ? value.toFixed(0) : value.toFixed(2);
 }

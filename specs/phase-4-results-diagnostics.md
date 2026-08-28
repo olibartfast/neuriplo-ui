@@ -178,6 +178,23 @@ fixtures already required by the existing test.
 
 ## Slice B — Extend the producer diagnostics contract
 
+**Status: implemented,** in `neuriplo-infer` first and then here.
+
+The producer publishes `app/inc/RunReport.hpp` / `app/src/RunReport.cpp`,
+writing `data/output/run_report.json` for every run and advertising it under
+`diagnostics.run_report` in `--capabilities` (covered by
+`docs/capabilities.schema.json`, `test_RunReport.cpp`, `test_RunDiagnostics.cpp`,
+and a new `capabilities_schema_contract` test). On this side,
+`apps/server/src/runReport.ts` reads and validates it, `runResponse.ts` carries
+`metrics` and `error.stage`, and `RunView.tsx` renders both.
+
+The shape below is what shipped, with two deviations worth recording. The
+report is a file in the run directory rather than a field on stdout, because
+stdout already carries a task's own JSON result and a second document there
+would break the existing parse. And the adapter discovers the file through the
+capabilities contract instead of a well-known name, so the frontend and adapter
+still hold no producer knowledge.
+
 This slice starts in `neuriplo-infer`; `neuriplo-ui` only consumes the resulting
 fields. The schema must be versioned and covered by producer contract tests
 before the UI depends on it.
