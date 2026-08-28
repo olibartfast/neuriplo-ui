@@ -203,3 +203,66 @@ select:disabled { opacity: .6; }
 }
 .browser-actions > .flag { flex: 1 1 200px; word-break: break-all; }
 .browser-buttons { display: flex; gap: 8px; }
+
+.run-header {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 20px;
+  margin: 16px 0 0;
+}
+.run-header .fact { min-width: 0; }
+.run-header dt {
+  color: #8f9ab2;
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.run-header dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.result-section { margin-top: 24px; border-top: 1px solid #27324e; padding-top: 16px; }
+.result-section h2 {
+  margin: 0 0 12px;
+  font-size: .95rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #8fa8ff;
+}
+.result-section .artifacts li:first-child { border-top: 0; padding-top: 0; }
+
+pre.command, pre.json, pre.log-body {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #27324e;
+  border-radius: 10px;
+  background: #0c1324;
+  color: #dbe3f7;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .8rem;
+  line-height: 1.5;
+}
+/* The command is one line and must stay copyable verbatim, so it scrolls
+   sideways instead of wrapping. */
+pre.command { overflow-x: auto; }
+pre.json, pre.log-body {
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.command-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.command-actions button.inline { margin-top: 8px; }
+.command-actions [data-testid="copy-status"]:empty { display: none; }
+
+.log { margin-top: 8px; }
+.log summary {
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .85rem;
+  font-weight: 600;
+}
+.log pre { margin-top: 8px; }
