@@ -253,6 +253,9 @@ test("launches a run once every requirement is supplied", async ({ page }) => {
       inputType: element.getAttribute("type"),
     }));
     if (type.tag === "SELECT" || type.inputType === "checkbox") continue;
+    // Optional parameters live inside the collapsed advanced section and need
+    // no value, so only what the form actually asks for is filled.
+    if (!(await control.isVisible())) continue;
     if ((await control.inputValue()) !== "") continue;
     await control.fill(
       type.inputType === "number" ? "1" : "/tmp/neuriplo-ui-fixture",
@@ -270,11 +273,52 @@ test("launches a run once every requirement is supplied", async ({ page }) => {
     { timeout: 60_000 },
   );
 
-  // A successful run renders whatever it produced, so an image artifact must
-  // be displayed rather than only linked.
-  if ((await page.getByTestId("run-status").textContent()) !== "Succeeded") {
+  const status = await page.getByTestId("run-status").textContent();
+
+  // A rejected request never reached the binary, so it has no command, wall
+  // time, or logs to show and must stay distinguishable from a failed run.
+  if (status === "Rejected") {
+    await expect(page.getByTestId("run-command")).toHaveCount(0);
+    await expect(page.getByTestId("run-summary")).toContainText(
+      "neuriplo-infer was not started",
+    );
     return;
   }
+
+  // Every completed run — successful or not — must be reproducible and
+  // diagnosable from what the panel shows.
+  const command = page.getByTestId("run-command");
+  await expect(command).toBeVisible();
+  await expect(command).toContainText(/neuriplo-infer/);
+  await expect(page.getByTestId("copy-command")).toBeEnabled();
+
+  // Wall time is the whole process, so the label must not claim latency.
+  await expect(page.getByTestId("run-header")).toContainText("Wall time");
+  await expect(page.getByTestId("run-header")).not.toContainText(/latency/i);
+  await expect(page.getByTestId("run-duration")).not.toBeEmpty();
+
+  await expect(page.getByTestId("log-toggle-stdout")).toBeVisible();
+  await expect(page.getByTestId("log-toggle-stderr")).toBeVisible();
+  await page.getByTestId("log-toggle-stdout").click();
+  await expect(page.getByTestId("log-stdout")).toBeVisible();
+
+  // A failed run puts its diagnosis on stderr, so that stream starts open.
+  if (status === "Failed") {
+    await expect(page.getByTestId("log-stderr")).toBeVisible();
+    return;
+  }
+
+  // A null structured result is an expected state: the section appears only
+  // when the binary actually emitted JSON on stdout.
+  const stdout = (await page.getByTestId("log-stdout").textContent()) ?? "";
+  const emitsJson = stdout.trimStart().startsWith("{") ||
+    stdout.trimStart().startsWith("[");
+  await expect(page.getByTestId("structured-result")).toHaveCount(
+    emitsJson ? 1 : 0,
+  );
+
+  // A successful run renders whatever it produced, so an image artifact must
+  // be displayed rather than only linked.
   const previews = page.locator('[data-testid^="artifact-preview-"]');
   expect(await previews.count()).toBeGreaterThan(0);
 

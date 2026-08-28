@@ -19,12 +19,8 @@ import {
   type ResolvedSelection,
   type Selection,
 } from "./selection.js";
-import {
-  RunFailedError,
-  startRun,
-  type RunResult,
-  type RunArtifact,
-} from "./run.js";
+import { RunFailedError, startRun } from "./run.js";
+import { RunPanel, type RunState } from "./RunView.js";
 import {
   DirectoryListingError,
   formatBytes,
@@ -36,12 +32,6 @@ import {
 type DiscoveryState =
   | { status: "loading" }
   | { status: "ready"; capabilities: NeuriploCapabilities }
-  | { status: "error"; code: string; message: string };
-
-type RunState =
-  | { status: "idle" }
-  | { status: "running" }
-  | { status: "done"; run: RunResult }
   | { status: "error"; code: string; message: string };
 
 export function App() {
@@ -359,112 +349,6 @@ function SourcePaths({
         running neuriplo-infer.
       </p>
     </div>
-  );
-}
-
-function RunPanel({
-  state,
-  capabilities,
-}: {
-  state: RunState;
-  capabilities: NeuriploCapabilities;
-}) {
-  const producer = (
-    <p className="hint" data-testid="producer">
-      neuriplo-infer {capabilities.producer.version} · schema v
-      {capabilities.schema_version}
-    </p>
-  );
-
-  if (state.status === "idle") {
-    return (
-      <section className="panel empty-state" aria-label="Run result">
-        <span data-testid="run-status">Idle</span>
-        <p>Results, latency, logs, and generated artifacts will appear here.</p>
-        {producer}
-      </section>
-    );
-  }
-
-  if (state.status === "running") {
-    return (
-      <section className="panel empty-state" aria-label="Run result">
-        <span data-testid="run-status">Running</span>
-        <p>Waiting for neuriplo-infer to finish.</p>
-        {producer}
-      </section>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <section className="panel notice" aria-label="Run result">
-        <span data-testid="run-status">Rejected</span>
-        <p data-testid="run-error">{state.message}</p>
-        <p className="hint">The run was refused with: {state.code}</p>
-        {producer}
-      </section>
-    );
-  }
-
-  const { run } = state;
-  return (
-    <section
-      className={run.status === "success" ? "panel" : "panel notice"}
-      aria-label="Run result"
-    >
-      <span data-testid="run-status">
-        {run.status === "success" ? "Succeeded" : "Failed"}
-      </span>
-      {run.error && <p data-testid="run-error">{run.error.message}</p>}
-      <p className="hint" data-testid="run-summary">
-        exit {run.exit_code ?? "—"} · {Math.round(run.duration_ms)} ms ·{" "}
-        {run.artifacts.length} artifact
-        {run.artifacts.length === 1 ? "" : "s"}
-      </p>
-      {run.artifacts.length > 0 && <Artifacts artifacts={run.artifacts} />}
-      {producer}
-    </section>
-  );
-}
-
-function Artifacts({ artifacts }: { artifacts: RunArtifact[] }) {
-  return (
-    <ul className="artifacts" data-testid="artifacts">
-      {artifacts.map((artifact) => (
-        <li key={artifact.name}>
-          <div className="artifact-meta">
-            <a href={artifact.url} target="_blank" rel="noreferrer">
-              {artifact.name}
-            </a>
-            <small className="flag">
-              {artifact.media_type} · {artifact.bytes} B
-            </small>
-          </div>
-          {/* The adapter reports the media type, so anything the browser can
-              display is shown rather than only offered as a download. */}
-          {artifact.media_type.startsWith("image/") && (
-            <a href={artifact.url} target="_blank" rel="noreferrer">
-              <img
-                data-testid={`artifact-preview-${artifact.name}`}
-                className="artifact-preview"
-                src={artifact.url}
-                alt={`Output rendered by neuriplo-infer: ${artifact.name}`}
-                loading="lazy"
-              />
-            </a>
-          )}
-          {artifact.media_type.startsWith("video/") && (
-            <video
-              data-testid={`artifact-preview-${artifact.name}`}
-              className="artifact-preview"
-              src={artifact.url}
-              controls
-            />
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }
 

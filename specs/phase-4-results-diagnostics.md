@@ -56,6 +56,17 @@ extensions described in Slice B.
 
 ## Slice A — Surface the response that exists
 
+**Status: implemented.** `apps/web/src/results.ts` holds the pure helpers,
+`apps/web/src/RunView.tsx` the terminal view, and
+`apps/web/test/results.test.ts` plus `apps/web/test/runView.test.tsx` the
+tests. The build, unit, and Playwright gates below all pass.
+
+One adapter change came out of it: `failureFor` had been quoting the last
+stderr line verbatim, which on a glog-wrapped error is a bare `>`
+continuation. Those continuation lines are now skipped, so a failed run shows
+the producer's actual message. That remains passing the message through, not
+classifying it.
+
 This slice is entirely local to `neuriplo-ui` and is the first implementation
 target.
 
