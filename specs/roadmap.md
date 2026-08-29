@@ -262,11 +262,38 @@ run is then required to succeed.
 
 ## Phase 7 — Packaging and CI integration
 
-- [ ] Add linting and formatting gates.
-- [ ] Add frontend/unit tests where useful.
-- [ ] Add GitHub Actions for build and Playwright smoke tests.
-- [ ] Define a Docker/dev-container workflow if it materially simplifies E2E setup.
-- [ ] Decide whether release packaging belongs here or in `neuriplo-platform`.
+Implementation contract: [Phase 7 — Packaging and CI integration](phase-7-packaging-ci.md).
+
+- [x] Add linting and formatting gates.
+- [x] Add frontend/unit tests where useful.
+- [x] Add GitHub Actions for build and Playwright smoke tests.
+- [x] Define a Docker/dev-container workflow if it materially simplifies E2E setup.
+- [x] Decide whether release packaging belongs here or in `neuriplo-platform`.
+
+The gate this phase actually needed was the one nobody had noticed was missing.
+Playwright runs TypeScript through esbuild and `node --import tsx` strips types
+at runtime, neither of which checks anything, and the server's tsconfig covered
+`src` alone — so the E2E harness, its fixtures, and every adapter test were
+never type-checked by anything. That was roughly a third of the repository's
+TypeScript, including the suite that proves the rest works.
+
+Linting is one tool rather than a stack, and its findings were fixed rather
+than suppressed: two dropped error causes, an implicit `any`, and a non-null
+assertion that would have failed inside React instead of naming the missing
+element. Two rules are configured off, each with its reason — and where the
+reason was that the rule cannot see through a component boundary, a browser
+test now asserts the property it could not see.
+
+Both conditional items are answered in the contract. The dev container earns
+its file by removing the one setup step that needs root, and nothing else;
+release packaging belongs in `neuriplo-platform`, because this repository
+produces nothing anyone installs and its adapter exists to expose a developer's
+own machine to a browser on the same machine.
+
+One finding from earlier phases is also closed here. `npm run dev` still served
+on `0.0.0.0` while proxying to that adapter, which is the Phase 5 preview
+finding in the place a developer actually runs. Both servers now bind loopback,
+with `NEURIPLO_UI_HOST` as the opt-in.
 
 ## Guiding rule
 

@@ -1,0 +1,35 @@
+{
+  // Optional, and only worth having for one reason: the browser matrix.
+  //
+  // A fresh clone needs `npm ci` and then `playwright install --with-deps
+  // chromium`, and that second step wants apt and root. It is fine on Ubuntu
+  // and awkward everywhere else. This image ships the browsers and their
+  // system libraries already, so E2E setup is `npm ci` and nothing more —
+  // verified by running the suite in this image with no install step.
+  //
+  // What it does not simplify is the real-producer path. A `neuriplo-infer`
+  // built with backends, its weights, and `neuriplo-kserve-runtime` are built
+  // in other repositories, and nothing here can put them in an image. The
+  // container gets you the fixture suite; the real matrix still needs the
+  // binaries and `NEURIPLO_INFER_BIN` pointed at them.
+  "name": "neuriplo-ui",
+
+  // Pinned to the @playwright/test version in package-lock.json. The two move
+  // together: an image older than the library is missing the browser build the
+  // library expects, and Playwright says so at run time rather than silently
+  // testing something else.
+  "image": "mcr.microsoft.com/playwright:v1.62.1-noble",
+
+  // The image brings its own Node, which satisfies the `engines` floor but is
+  // not the version CI pins. CI remains the authority on what is supported.
+  "postCreateCommand": "npm ci",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["biomejs.biome", "ms-playwright.playwright"],
+      "settings": {
+        "editor.defaultFormatter": "biomejs.biome"
+      }
+    }
+  }
+}
