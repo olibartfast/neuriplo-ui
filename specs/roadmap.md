@@ -177,25 +177,47 @@ termination are the adapter's own verdicts about a run it stopped.
 
 Goal: turn Neuriplo UI into a regression harness rather than only a manual frontend.
 
-- [ ] Start web/server automatically from Playwright configuration or CI.
-- [ ] Add deterministic fixture assets.
-- [ ] Test at least one pipeline per major task family.
-- [ ] Test local backend switching when CI runners support the backend.
+Implementation contract: [Phase 5 — Real E2E matrix](phase-5-e2e-matrix.md).
+
+- [x] Start web/server automatically from Playwright configuration or CI.
+- [x] Add deterministic fixture assets.
+- [x] Test at least one pipeline per major task family.
+- [x] Test local backend switching when CI runners support the backend.
 - [ ] Test client-server execution against a deterministic test runtime.
-- [ ] Assert output artifact creation.
-- [ ] Assert structured result semantics rather than only HTTP success.
-- [ ] Store Playwright traces and logs on failure.
+- [x] Assert output artifact creation.
+- [x] Assert structured result semantics rather than only HTTP success.
+- [x] Store Playwright traces and logs on failure.
 
-Suggested first E2E path:
+The blocker was never the tests, it was the producer: a real run needs weights
+measured in hundreds of megabytes and a backend compiled into the binary, so on
+an arbitrary machine nothing stronger than "it reached a terminal state" is
+true. The harness therefore supplies a fixture producer — a contract double
+implementing the capabilities and run-report contracts whose output is a
+function of its arguments. It renders nothing and infers nothing, because
+inference is `neuriplo-infer`'s own suite's job; what is tested here is the path
+from a contract to a rendered run.
 
-```text
-Object Detection
-  -> YOLO26
-  -> ONNX Runtime or OpenCV DNN
-  -> fixture image
-  -> successful JSON result
-  -> rendered output artifact
-```
+Two rules keep the double from becoming a private second source of truth: it is
+held to the adapter's own capabilities validator, so a contract change that
+breaks the real producer breaks the fixture with it; and every assertion is
+derived from the contract at runtime, so the suite runs unchanged against a real
+binary. The two assertions that need a known output check the advertised
+`producer.version` — the fixture's ends in `-fixture` — rather than being
+written twice.
+
+A family here is a shape of contract rather than a kind of model: single-source
+image, multi-source, video, and prompt-driven are what the UI actually branches
+on. The matrix picks a representative per family from the contract at runtime,
+so a real binary exercises its own families without the suite naming any of
+them.
+
+One item stays open, and it needs a dependency this repository does not own.
+Client-server execution is driven end to end through the browser and the
+adapter, but against a producer rather than a server: a deterministic remote
+runtime is the missing half, and it belongs with the Phase 6 remote work.
+
+Local backend switching is implemented and skips with its reason on a build
+advertising a single backend, which is what every current build does.
 
 ## Phase 6 — Remote inference and benchmark workflows
 
