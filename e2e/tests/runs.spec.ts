@@ -8,6 +8,10 @@ import {
   expectRunOutcome,
   isFixtureProducer,
   launchRun,
+  REMOTE_MODEL,
+  remoteRoundTripModel,
+  remoteServerName,
+  setParameter,
   taskForFamily,
   type Family,
 } from "./support/harness.js";
@@ -149,6 +153,377 @@ test("reports a completed run as a reproducible report", async ({ page }) => {
   await expect(page.getByTestId("log-toggle-stderr")).toBeVisible();
   await page.getByTestId("log-toggle-stdout").click();
   await expect(page.getByTestId("log-stdout")).toBeVisible();
+});
+
+test("retains finished runs and returns to an earlier one", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Nothing has run, so there is no history to show.
+  await expect(page.getByTestId("history")).toHaveCount(0);
+
+  await configureRun(page, capabilities, { task });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const first = await page.getByTestId("run-id").textContent();
+
+  await expect(page.getByTestId("history")).toBeVisible();
+  await expect(page.getByTestId(`history-entry-${first}`)).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // A second run of the same configuration is a second entry, not a
+  // replacement: two runs of one configuration are what a comparison needs.
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const second = await page.getByTestId("run-id").textContent();
+  expect(second).not.toBe(first);
+
+  const entries = page.locator('[data-testid^="history-entry-"]');
+  await expect(entries).toHaveCount(2);
+  // Newest first.
+  await expect(entries.first()).toHaveAttribute(
+    "data-testid",
+    `history-entry-${second}`,
+  );
+
+  // Selecting the earlier run shows that run, unchanged.
+  await page.getByTestId(`history-entry-${first}`).click();
+  await expect(page.getByTestId("run-id")).toHaveText(first!);
+  await expect(page.getByTestId(`history-entry-${first}`)).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.getByTestId("run-command")).toContainText("--type=");
+});
+
+test("never retains a request the adapter refused", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  await configureRun(page, capabilities, { task });
+  // A source that does not exist is refused before anything is spawned.
+  await page.getByTestId("source-path-0").fill("/tmp/neuriplo-ui-absent-source");
+  expect(await launchRun(page)).toBe("Rejected");
+
+  // A rejection never reached the binary, so it has nothing to compare and
+  // must not appear as a run that happened.
+  await expect(page.getByTestId("history")).toHaveCount(0);
+  await expect(page.getByTestId("run-summary")).toContainText(
+    "neuriplo-infer was not started",
+  );
+});
+
+test("compares two runs and marks what differed", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const local = capabilities.execution.workflows.find((w) => w.id === "local");
+  const remote = capabilities.execution.workflows.find(
+    (w) => w.id === "client_server",
+  );
+  test.skip(
+    local === undefined || remote === undefined,
+    "the build advertises a single execution workflow",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Local against remote is the motivating comparison, and needs no special
+  // support: they are two runs with different executions.
+  await configureRun(page, capabilities, { task, workflow: "local" });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const first = (await page.getByTestId("run-id").textContent())!;
+
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+  await expectRunOutcome(page, capabilities, await launchRun(page), {
+    remote: true,
+  });
+  const second = (await page.getByTestId("run-id").textContent())!;
+
+  // A reload clears the page's history, so only the second run survives; run
+  // the first again to have two in the same session.
+  await configureRun(page, capabilities, { task, workflow: "local" });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const third = (await page.getByTestId("run-id").textContent())!;
+  expect(third).not.toBe(second);
+  expect(third).not.toBe(first);
+
+  await expect(page.getByTestId("comparison")).toHaveCount(0);
+  await page.getByTestId(`compare-${second}`).check();
+  // One run is not a comparison.
+  await expect(page.getByTestId("comparison")).toHaveCount(0);
+
+  await page.getByTestId(`compare-${third}`).check();
+  const comparison = page.getByTestId("comparison");
+  await expect(comparison).toBeVisible();
+  await expect(page.getByTestId("comparison-caption")).toContainText(
+    "differing in execution",
+  );
+
+  // Execution differed by construction; the task did not.
+  await expect(
+    page.getByTestId("comparison-row-execution"),
+  ).toHaveAttribute("data-differs", "true");
+  await expect(page.getByTestId("comparison-row-task")).toHaveAttribute(
+    "data-differs",
+    "false",
+  );
+
+  // Nothing in the table concludes anything from the numbers.
+  await expect(comparison).not.toContainText(/faster|slower|speedup/i);
+});
+
+test("repeats a configuration and summarizes what the runs measured", async ({
+  page,
+}) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task });
+
+  await page.getByTestId("repeat").fill("3");
+  await expect(page.getByTestId("run")).toContainText("Run 3 times");
+  await expect(page.getByTestId("run-hint")).toContainText("one after another");
+
+  await page.getByTestId("run").click();
+  // Three sequential runs, so the wait covers all of them.
+  await expect(page.getByTestId("history").locator("li")).toHaveCount(3, {
+    timeout: 120_000,
+  });
+  await expect(page.getByTestId("run-status")).toHaveText(/Succeeded|Failed/);
+
+  // A repetition selects itself for comparison: it is a set worth looking at
+  // together, and ticking each run by hand would be busywork.
+  const summary = page.getByTestId("summary");
+  await expect(summary).toBeVisible();
+  await expect(page.getByTestId("comparison-caption")).toContainText(
+    "same configuration",
+  );
+
+  const wallTime = page.getByTestId("summary-row-wall-time-whole-process");
+  await expect(wallTime).toBeVisible();
+  // Every run reported its own wall time, so all three contributed.
+  await expect(wallTime.locator("td").first()).toHaveText("3");
+
+  // The distinction the producer contract forces: this summarizes runs, not
+  // the iterations of a benchmark loop nobody published per-iteration data for.
+  await expect(page.getByText(/not over the iterations of/)).toBeVisible();
+  await expect(summary).not.toContainText(/p9[059]|percentile/i);
+});
+
+test("describes the remote server the endpoint addresses", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  test.skip(
+    remote === undefined,
+    "the build advertises no client-server workflow",
+  );
+
+  const endpoint = remote!.parameters.required.find(
+    (id) => capabilities.parameters[id]?.value_type === "url",
+  );
+  test.skip(
+    endpoint === undefined,
+    "the contract advertises no endpoint parameter",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+
+  // The panel must show what the server said, so the expected name is read
+  // from the server rather than written into the suite — which keeps this true
+  // whether the fixture responder or a real runtime is answering.
+  const named = await remoteServerName();
+  expect(named).not.toBeNull();
+
+  const metadata = page.getByTestId("remote-metadata");
+  await expect(metadata).toBeVisible({ timeout: 15_000 });
+  await expect(metadata).toContainText(named!);
+
+  // Model metadata needs a model to ask about, found the way the UI finds it:
+  // a string parameter whose id names a model rather than a version.
+  const modelParameter = [
+    ...remote!.parameters.required,
+    ...remote!.parameters.optional,
+  ].find(
+    (id) =>
+      capabilities.parameters[id]?.value_type === "string" &&
+      /model/i.test(id) &&
+      !/version/i.test(id),
+  );
+  test.skip(
+    modelParameter === undefined,
+    "the contract advertises no remote model parameter",
+  );
+
+  // The name both remotes publish, so the assertion does not depend on which
+  // of them the harness started.
+  await setParameter(page, modelParameter!, REMOTE_MODEL);
+
+  // Whether the server knows this model depends on what it serves, and both
+  // answers are legitimate — the panel has to state which one it got.
+  const described = page.getByTestId("remote-platform");
+  const unknown = page.getByTestId("remote-model-unknown");
+  await expect(described.or(unknown).first()).toBeVisible({ timeout: 15_000 });
+
+  if (await described.count()) {
+    await expect(described).not.toBeEmpty();
+    await expect(page.getByTestId("remote-inputs")).toContainText("FP32");
+  } else {
+    // A model the server does not publish is not an error about the server.
+    await expect(unknown).toContainText("did not describe this model");
+    await expect(metadata).toBeVisible();
+  }
+
+  // The description never gates the run, either way.
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("refuses an endpoint outside the adapter's allowlist", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  const endpoint = remote?.parameters.required.find(
+    (id) => capabilities.parameters[id]?.value_type === "url",
+  );
+  test.skip(
+    endpoint === undefined,
+    "the contract advertises no endpoint parameter",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+
+  // The adapter can reach hosts the browser cannot, so an endpoint it was not
+  // configured to allow is refused before anything connects.
+  await setParameter(page, endpoint!, "http://169.254.169.254/latest/meta-data");
+  await expect(page.getByTestId("remote-error")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("remote-error")).toContainText("not permitted");
+  await expect(page.getByTestId("remote-metadata")).toHaveCount(0);
+
+  // A refusal describes nothing about the server and blocks nothing.
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("completes a client-server run against the deterministic runtime", async ({
+  page,
+}) => {
+  const selector = remoteRoundTripModel();
+  test.skip(
+    selector === null,
+    "set NEURIPLO_UI_E2E_REMOTE_MODEL to a selector the runtime's stub tensors fit",
+  );
+
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  test.skip(remote === undefined, "the build advertises no client-server workflow");
+
+  const task = capabilities.tasks.find((candidate) =>
+    candidate.models.some((model) => model.id === selector),
+  );
+  test.skip(
+    task === undefined,
+    `no advertised task offers the model ${selector}`,
+  );
+
+  await configureRun(page, capabilities, {
+    task: task!,
+    workflow: "client_server",
+    model: selector!,
+  });
+
+  const parameters = [
+    ...remote!.parameters.required,
+    ...remote!.parameters.optional,
+  ];
+  const modelParameter = parameters.find(
+    (id) =>
+      capabilities.parameters[id]?.value_type === "string" &&
+      /model/i.test(id) &&
+      !/version/i.test(id),
+  );
+  if (modelParameter) await setParameter(page, modelParameter, REMOTE_MODEL);
+
+  // This is the whole point of the slice: inference actually served by a
+  // remote, not a metadata responder standing in for one.
+  expect(await launchRun(page)).toBe("Succeeded");
+  await expect(page.getByTestId("run-header")).toContainText("client_server");
+  await expect(page.getByTestId("artifacts")).toBeVisible();
+  await expect(page.locator('[data-testid^="artifact-preview-"]').first()).toBeVisible();
+});
+
+test("holds the controls until every run in a batch has finished", async ({
+  page,
+}) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Each run is delayed so the gap between them is observable: a finished run
+  // leaves the live state "done" while later ones are still to come, which is
+  // exactly when the controls must stay held.
+  await page.route("**/api/runs", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.continue();
+  });
+
+  await configureRun(page, capabilities, { task });
+  await page.getByTestId("repeat").fill("2");
+  await page.getByTestId("run").click();
+
+  const entries = page.locator('[data-testid^="history-entry-"]');
+  await expect(entries).toHaveCount(1, { timeout: 30_000 });
+
+  // The first run has landed and the second has not started. Launching another
+  // batch here would create exactly the device contention sequencing prevents.
+  await expect(page.getByTestId("run")).toBeDisabled();
+  await expect(page.getByTestId("repeat")).toBeDisabled();
+  await expect(page.getByTestId("run")).toContainText("of 2");
+
+  await expect(entries).toHaveCount(2, { timeout: 30_000 });
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("shows a rejection that stopped a batch part-way", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // The first run succeeds, the second is refused.
+  let seen = 0;
+  await page.route("**/api/runs", async (route) => {
+    seen += 1;
+    if (seen === 1) return route.continue();
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "error",
+        error: { code: "invalid_source", message: "Source path does not exist" },
+      }),
+    });
+  });
+
+  await configureRun(page, capabilities, { task });
+  await page.getByTestId("repeat").fill("2");
+  await page.getByTestId("run").click();
+
+  // The batch stopped early, and saying so outranks continuing to display the
+  // run that did succeed.
+  await expect(page.getByTestId("run-status")).toHaveText("Rejected", {
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId("run-error")).toContainText(
+    "Source path does not exist",
+  );
+
+  // The successful run is still retained; it is simply not what is shown.
+  await expect(page.locator('[data-testid^="history-entry-"]')).toHaveCount(1);
+  await expect(page.getByTestId("run")).toBeEnabled();
 });
 
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
