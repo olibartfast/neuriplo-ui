@@ -1,5 +1,6 @@
 import type { RunResult } from "./run.js";
 import { compareRuns, describeComparison } from "./compare.js";
+import { summarize } from "./summary.js";
 import { labelFor } from "./contract.js";
 
 /**
@@ -72,6 +73,67 @@ export function ComparePanel({ runs }: { runs: readonly RunResult[] }) {
         not supply. Nothing here is normalized across machines, and no run is
         called faster than another.
       </p>
+
+      <SummaryTable runs={runs} />
     </section>
+  );
+}
+
+/**
+ * Statistics over repetitions of one configuration.
+ *
+ * Shown only when the runs are repetitions of the same thing: aggregating
+ * across different models or executions would produce a number describing
+ * nothing, and that set is what the comparison above is for.
+ */
+function SummaryTable({ runs }: { runs: readonly RunResult[] }) {
+  const summary = summarize(runs);
+  if (!summary || summary.rows.length === 0) return null;
+
+  return (
+    <>
+      <h3>
+        Across {summary.runs} runs <span className="flag">of one configuration</span>
+      </h3>
+      <div className="comparison-scroll">
+        <table className="comparison" data-testid="summary">
+          <thead>
+            <tr>
+              <th scope="col">Measurement</th>
+              <th scope="col">Runs</th>
+              <th scope="col">Min</th>
+              <th scope="col">Median</th>
+              <th scope="col">Max</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summary.rows.map((row) => (
+              <tr
+                key={row.label}
+                data-testid={`summary-row-${row.label
+                  .toLowerCase()
+                  .replace(/[^a-z]+/g, "-")
+                  .replace(/^-|-$/g, "")}`}
+              >
+                <th scope="row">{row.label}</th>
+                <td>{row.count}</td>
+                <td>{row.min}</td>
+                <td>{row.median}</td>
+                <td>{row.max}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="hint">
+        {/* The distinction is load-bearing: this summarizes whole runs the UI
+            launched, not iterations inside a producer's own benchmark loop,
+            which publishes a single observation and no per-iteration values. */}
+        A summary over {summary.runs} separate runs — not over the iterations of
+        a producer benchmark, which reports one observation per run. Only
+        minimum, median, and maximum are shown, because a percentile over this
+        many runs would claim precision the sample does not carry.
+      </p>
+    </>
   );
 }

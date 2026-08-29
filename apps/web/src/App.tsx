@@ -32,6 +32,12 @@ import {
   type DirectoryListing,
 } from "./files.js";
 
+/**
+ * Ceiling on a repetition. Every run keeps its whole stdout and stderr in the
+ * page and a directory on disk, so the count stays something a person chose.
+ */
+const MAX_REPEAT = 20;
+
 type DiscoveryState =
   | { status: "loading" }
   | { status: "ready"; capabilities: NeuriploCapabilities }
@@ -122,6 +128,11 @@ function Configurator({
   // Which runs are being compared, which is a separate choice from which run
   // is displayed: comparing two should not stop you looking at a third.
   const [comparedIds, setComparedIds] = useState<string[]>([]);
+  const [repeat, setRepeat] = useState(1);
+  // Which run of how many, while a repetition is in flight.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -175,18 +186,32 @@ function Configurator({
         : [...current, runId],
     );
 
-  const launch = () => {
+  /**
+   * Runs the current configuration `repeat` times, one after another.
+   *
+   * Sequential rather than concurrent on purpose: parallel runs would contend
+   * for the same device and make every measurement they produced meaningless.
+   * A repetition stops at the first rejection, because the adapter refusing
+   * the request means the remaining runs would be refused identically.
+   */
+  const launch = async () => {
+    const total = Math.max(1, Math.min(repeat, MAX_REPEAT));
     setRun({ status: "running" });
     setSelectedId(null);
-    startRun(resolved)
-      .then((result) => {
+    setProgress(total > 1 ? { done: 0, total } : null);
+
+    const launched: string[] = [];
+    for (let index = 0; index < total; index += 1) {
+      try {
+        const result = await startRun(resolved);
         setRun({ status: "done", run: result });
         // A run that ran is retained and becomes the selection; a rejection
-        // below never gets here, because it has nothing to compare.
+        // never gets here, because it has nothing to compare.
         setHistory((entries) => remember(entries, result));
         setSelectedId(result.run_id);
-      })
-      .catch((error: unknown) => {
+        launched.push(result.run_id);
+        setProgress(total > 1 ? { done: index + 1, total } : null);
+      } catch (error: unknown) {
         const failure =
           error instanceof RunFailedError
             ? error
@@ -199,7 +224,14 @@ function Configurator({
           code: failure.code,
           message: failure.message,
         });
-      });
+        break;
+      }
+    }
+
+    setProgress(null);
+    // A repetition is a set worth looking at together, so it selects itself
+    // for comparison rather than making the user tick each run.
+    if (launched.length > 1) setComparedIds(launched);
   };
 
   return (
@@ -308,18 +340,47 @@ function Configurator({
           </details>
         )}
 
-        <button
-          data-testid="run"
-          type="button"
-          disabled={missing.length > 0 || run.status === "running"}
-          onClick={launch}
-        >
-          {run.status === "running" ? "Running…" : "Run inference"}
-        </button>
+        <div className="launch">
+          <button
+            data-testid="run"
+            type="button"
+            disabled={missing.length > 0 || run.status === "running"}
+            onClick={() => void launch()}
+          >
+            {run.status === "running"
+              ? progress
+                ? `Running ${progress.done + 1} of ${progress.total}…`
+                : "Running…"
+              : repeat > 1
+                ? `Run ${repeat} times`
+                : "Run inference"}
+          </button>
+          <label className="repeat">
+            <span>Repeat</span>
+            <input
+              data-testid="repeat"
+              type="number"
+              min={1}
+              max={MAX_REPEAT}
+              value={repeat}
+              disabled={run.status === "running"}
+              onChange={(event) =>
+                setRepeat(
+                  Math.max(
+                    1,
+                    Math.min(MAX_REPEAT, Number(event.target.value) || 1),
+                  ),
+                )
+              }
+            />
+          </label>
+        </div>
         <p className="hint" data-testid="run-hint">
           {missing.length > 0
             ? `Provide ${missing.map(labelFor).join(", ")} before running.`
-            : "Launches neuriplo-infer through the local adapter."}
+            : repeat > 1
+              ? `Launches ${repeat} runs one after another, so they do not contend for the same device.`
+              : "Launches neuriplo-infer through the local adapter."}
         </p>
       </section>
 

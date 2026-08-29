@@ -120,6 +120,11 @@ to narrow a selection, because the contract that governs selection is
 
 ## Slice C — Repeated runs and summary statistics
 
+**Status: implemented.** `apps/web/src/summary.ts` holds the aggregation,
+rendered under the comparison in `CompareView.tsx`, with unit tests in
+`apps/web/test/summary.test.ts` and a browser path that repeats a
+configuration three times.
+
 ### C1. Repeat a configuration
 
 Let the user run the same configuration N times. Runs execute one after

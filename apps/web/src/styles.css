@@ -309,3 +309,8 @@ pre.json, pre.log-body {
 .comparison tr.differs th[scope="row"] { font-weight: 700; }
 .comparison tr.differs td { font-weight: 600; }
 .comparison td.absent { opacity: .55; }
+
+.launch { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.launch .repeat { display: flex; align-items: center; gap: 8px; margin: 0; }
+.launch .repeat span { font-size: .8rem; color: #6d7893; }
+.launch .repeat input { width: 72px; }
