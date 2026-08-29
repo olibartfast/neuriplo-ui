@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-  RemoteMetadataError,
   fetchRemoteMetadata,
   type RemoteMetadata,
+  RemoteMetadataError,
   type RemoteTensor,
 } from "./remote.js";
 
@@ -114,7 +114,11 @@ function Described({ metadata }: { metadata: RemoteMetadata }) {
           <Fact label="Extensions" value={server.extensions.join(", ")} />
         )}
         {model?.platform && (
-          <Fact label="Platform" value={model.platform} testId="remote-platform" />
+          <Fact
+            label="Platform"
+            value={model.platform}
+            testId="remote-platform"
+          />
         )}
         {model && model.versions.length > 0 && (
           <Fact label="Model versions" value={model.versions.join(", ")} />
@@ -128,8 +132,16 @@ function Described({ metadata }: { metadata: RemoteMetadata }) {
         </p>
       ) : (
         <>
-          <Tensors label="Inputs" tensors={model.inputs} testId="remote-inputs" />
-          <Tensors label="Outputs" tensors={model.outputs} testId="remote-outputs" />
+          <Tensors
+            label="Inputs"
+            tensors={model.inputs}
+            testId="remote-inputs"
+          />
+          <Tensors
+            label="Outputs"
+            tensors={model.outputs}
+            testId="remote-outputs"
+          />
         </>
       )}
 

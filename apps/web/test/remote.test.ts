@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { remoteParameters } from "../src/remote.js";
 import type {
   CapabilityWorkflow,
   NeuriploCapabilities,
 } from "../src/contract.js";
+import { remoteParameters } from "../src/remote.js";
 
 const capabilities = {
   parameters: {
@@ -48,7 +48,10 @@ test("finds the endpoint by its advertised type", () => {
 test("tells the model name and its version apart", () => {
   const found = remoteParameters(
     capabilities,
-    workflow(["kserve_endpoint"], ["kserve_model_name", "kserve_model_version"]),
+    workflow(
+      ["kserve_endpoint"],
+      ["kserve_model_name", "kserve_model_version"],
+    ),
   );
 
   assert.equal(found.model, "kserve_model_name");

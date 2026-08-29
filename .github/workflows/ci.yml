@@ -1,8 +1,9 @@
 name: CI
 
-# Runs exactly the gates Phase 5 defines: build, unit tests, and the browser
-# matrix against the fixture producer. Linting, formatting, and packaging are
-# Phase 7's, and are deliberately not run here yet.
+# Two jobs, deliberately. `checks` is seconds of work, so a formatting slip or
+# a type error should not be reported eight minutes later from behind a browser
+# matrix — and a style failure should not stop the E2E suite telling us whether
+# the product still works.
 
 on:
   push:
@@ -10,6 +11,26 @@ on:
   pull_request:
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      # Formatting, lint, and import order in one pass. Reports rather than
+      # rewrites: CI is a gate, and a gate that edits the branch is not one.
+      - run: npm run lint
+
+      # Covers the E2E harness and the adapter's tests, which nothing compiles
+      # and which Playwright and tsx both run by stripping types unchecked.
+      - run: npm run typecheck
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

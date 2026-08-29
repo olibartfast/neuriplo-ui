@@ -1,6 +1,6 @@
-import type { RunResult } from "./run.js";
-import { describeExecution, formatDuration, labelForStage } from "./results.js";
 import { sameConfiguration } from "./compare.js";
+import { describeExecution, formatDuration, labelForStage } from "./results.js";
+import type { RunResult } from "./run.js";
 
 /**
  * Summarizing a set of runs.
@@ -71,7 +71,8 @@ function measurements(): Measurement[] {
   rows.push({
     label: "Throughput",
     of: (run) => run.metrics?.throughput_per_second ?? null,
-    format: (value) => `${value >= 100 ? value.toFixed(0) : value.toFixed(2)} /s`,
+    format: (value) =>
+      `${value >= 100 ? value.toFixed(0) : value.toFixed(2)} /s`,
   });
 
   return rows;

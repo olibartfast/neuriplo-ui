@@ -1,0 +1,11 @@
+{
+  // Type checking is not compiling: the build emits `src` alone, while this
+  // config checks the tests as well. Without it `node --import tsx` strips the
+  // suite's types at runtime and nothing ever verifies them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

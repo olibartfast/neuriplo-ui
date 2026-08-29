@@ -235,7 +235,10 @@ async function getJson(
  * reading rather than trusted from a header: an endpoint that streams forever
  * must not be able to exhaust the adapter.
  */
-async function readBounded(response: Response, maxBytes: number): Promise<string> {
+async function readBounded(
+  response: Response,
+  maxBytes: number,
+): Promise<string> {
   const body = response.body;
   if (!body) return "";
 

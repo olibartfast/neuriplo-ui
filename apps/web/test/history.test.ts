@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  HISTORY_LIMIT,
   entryFor,
   formatAge,
-  remember,
+  HISTORY_LIMIT,
   type HistoryEntry,
+  remember,
 } from "../src/history.js";
 import type { RunResult } from "../src/run.js";
 
@@ -37,7 +37,11 @@ function runWith(runId: string): RunResult {
 }
 
 test("keeps the newest run first", () => {
-  const history = remember(remember([], runWith("first"), 1), runWith("second"), 2);
+  const history = remember(
+    remember([], runWith("first"), 1),
+    runWith("second"),
+    2,
+  );
 
   assert.deepEqual(
     history.map((entry) => entry.run.run_id),

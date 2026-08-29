@@ -1,11 +1,12 @@
 // tsx compiles this file with the classic JSX runtime, so React stays in scope.
-import React from "react";
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { NeuriploCapabilities } from "../src/contract.js";
-import type { RunResult } from "../src/run.js";
 import { RunPanel, type RunState } from "../src/RunView.js";
+import type { RunResult } from "../src/run.js";
 
 const capabilities = {
   schema_version: 1,
@@ -109,7 +110,7 @@ test("renders scalar and empty structured results generically", () => {
     [{}, "{}"],
     [[], "[]"],
     [42, "42"],
-    ["done", '&quot;done&quot;'],
+    ["done", "&quot;done&quot;"],
   ] as Array<[unknown, string]>) {
     const markup = done({ result });
     assert.match(markup, /Structured result/);
@@ -161,7 +162,10 @@ test("names timeout and signal termination rather than a missing exit code", () 
     status: "failed",
     exit_code: null,
     signal: "SIGKILL",
-    error: { code: "terminated", message: "neuriplo-infer was terminated by SIGKILL" },
+    error: {
+      code: "terminated",
+      message: "neuriplo-infer was terminated by SIGKILL",
+    },
   });
   assert.match(killed, /terminated by SIGKILL/);
   assert.match(killed, /Signal/);

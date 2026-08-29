@@ -1,11 +1,12 @@
 import { statSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import {
-  FIXTURES,
-  IMAGE_FIXTURE_SIZE,
   capabilitiesOf,
   configureRun,
   expectRunOutcome,
+  type Family,
+  FIXTURES,
+  IMAGE_FIXTURE_SIZE,
   isFixtureProducer,
   launchRun,
   REMOTE_MODEL,
@@ -13,7 +14,6 @@ import {
   remoteServerName,
   setParameter,
   taskForFamily,
-  type Family,
 } from "./support/harness.js";
 
 /**
@@ -89,8 +89,9 @@ test("shows a successful run's artifact, result, and producer metrics", async ({
   await expect(page.getByTestId("metric-throughput")).not.toBeEmpty();
   // A still image has no frames, and an unmeasured value is not a zero.
   await expect(page.getByTestId("metric-frames")).toHaveCount(0);
-  expect(await page.getByTestId("metric-producer-wall-time").textContent()).not
-    .toBe(await page.getByTestId("run-duration").textContent());
+  expect(
+    await page.getByTestId("metric-producer-wall-time").textContent(),
+  ).not.toBe(await page.getByTestId("run-duration").textContent());
 });
 
 test("attributes a failed run to the stage the producer named", async ({
@@ -104,7 +105,9 @@ test("attributes a failed run to the stage the producer named", async ({
 
   const task = taskForFamily(capabilities, "image")!;
   await configureRun(page, capabilities, { task });
-  await page.getByTestId("source-path-0").fill(FIXTURES.failInStage("inference"));
+  await page
+    .getByTestId("source-path-0")
+    .fill(FIXTURES.failInStage("inference"));
   expect(await launchRun(page)).toBe("Failed");
 
   await expect(page.getByTestId("run-error-stage")).toContainText("Inference");
@@ -155,7 +158,9 @@ test("reports a completed run as a reproducible report", async ({ page }) => {
   await expect(page.getByTestId("log-stdout")).toBeVisible();
 });
 
-test("retains finished runs and returns to an earlier one", async ({ page }) => {
+test("retains finished runs and returns to an earlier one", async ({
+  page,
+}) => {
   const capabilities = await capabilitiesOf(page);
   const task = taskForFamily(capabilities, "image")!;
 
@@ -202,7 +207,9 @@ test("never retains a request the adapter refused", async ({ page }) => {
 
   await configureRun(page, capabilities, { task });
   // A source that does not exist is refused before anything is spawned.
-  await page.getByTestId("source-path-0").fill("/tmp/neuriplo-ui-absent-source");
+  await page
+    .getByTestId("source-path-0")
+    .fill("/tmp/neuriplo-ui-absent-source");
   expect(await launchRun(page)).toBe("Rejected");
 
   // A rejection never reached the binary, so it has nothing to compare and
@@ -261,9 +268,10 @@ test("compares two runs and marks what differed", async ({ page }) => {
   );
 
   // Execution differed by construction; the task did not.
-  await expect(
-    page.getByTestId("comparison-row-execution"),
-  ).toHaveAttribute("data-differs", "true");
+  await expect(page.getByTestId("comparison-row-execution")).toHaveAttribute(
+    "data-differs",
+    "true",
+  );
   await expect(page.getByTestId("comparison-row-task")).toHaveAttribute(
     "data-differs",
     "false",
@@ -380,7 +388,9 @@ test("describes the remote server the endpoint addresses", async ({ page }) => {
   await expect(page.getByTestId("run")).toBeEnabled();
 });
 
-test("refuses an endpoint outside the adapter's allowlist", async ({ page }) => {
+test("refuses an endpoint outside the adapter's allowlist", async ({
+  page,
+}) => {
   const capabilities = await capabilitiesOf(page);
   const remote = capabilities.execution.workflows.find(
     (workflow) => workflow.id === "client_server",
@@ -398,7 +408,11 @@ test("refuses an endpoint outside the adapter's allowlist", async ({ page }) => 
 
   // The adapter can reach hosts the browser cannot, so an endpoint it was not
   // configured to allow is refused before anything connects.
-  await setParameter(page, endpoint!, "http://169.254.169.254/latest/meta-data");
+  await setParameter(
+    page,
+    endpoint!,
+    "http://169.254.169.254/latest/meta-data",
+  );
   await expect(page.getByTestId("remote-error")).toBeVisible({
     timeout: 15_000,
   });
@@ -422,7 +436,10 @@ test("completes a client-server run against the deterministic runtime", async ({
   const remote = capabilities.execution.workflows.find(
     (workflow) => workflow.id === "client_server",
   );
-  test.skip(remote === undefined, "the build advertises no client-server workflow");
+  test.skip(
+    remote === undefined,
+    "the build advertises no client-server workflow",
+  );
 
   const task = capabilities.tasks.find((candidate) =>
     candidate.models.some((model) => model.id === selector),
@@ -455,7 +472,9 @@ test("completes a client-server run against the deterministic runtime", async ({
   expect(await launchRun(page)).toBe("Succeeded");
   await expect(page.getByTestId("run-header")).toContainText("client_server");
   await expect(page.getByTestId("artifacts")).toBeVisible();
-  await expect(page.locator('[data-testid^="artifact-preview-"]').first()).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="artifact-preview-"]').first(),
+  ).toBeVisible();
 });
 
 test("holds the controls until every run in a batch has finished", async ({
@@ -503,7 +522,10 @@ test("shows a rejection that stopped a batch part-way", async ({ page }) => {
       contentType: "application/json",
       body: JSON.stringify({
         status: "error",
-        error: { code: "invalid_source", message: "Source path does not exist" },
+        error: {
+          code: "invalid_source",
+          message: "Source path does not exist",
+        },
       }),
     });
   });

@@ -115,9 +115,7 @@ export async function capabilitiesOf(
  * only thing that distinguishes it, and it gates the assertions that depend on
  * values only a deterministic producer can guarantee.
  */
-export function isFixtureProducer(
-  capabilities: NeuriploCapabilities,
-): boolean {
+export function isFixtureProducer(capabilities: NeuriploCapabilities): boolean {
   return capabilities.producer.version.endsWith("-fixture");
 }
 
@@ -202,7 +200,8 @@ export async function configureRun(
     (workflows.some((entry) => entry.id === "local")
       ? "local"
       : workflows[0].id);
-  const workflow = workflows.find((entry) => entry.id === wanted) ?? workflows[0];
+  const workflow =
+    workflows.find((entry) => entry.id === wanted) ?? workflows[0];
 
   await choose(page, "workflow", workflow.id);
   if (configuration.backend) {
@@ -248,7 +247,11 @@ export async function launchRun(page: Page): Promise<string> {
  * choose — and one the contract does not advertise is not rendered at all. In
  * both cases the value is already the only one it can be.
  */
-async function choose(page: Page, testId: string, value: string): Promise<void> {
+async function choose(
+  page: Page,
+  testId: string,
+  value: string,
+): Promise<void> {
   const control = page.getByTestId(testId);
   if ((await control.count()) === 0) return;
   if (!(await control.isEnabled())) {
@@ -305,7 +308,8 @@ async function fillSources(page: Page, task: CapabilityTask): Promise<void> {
 
   for (let index = 0; index < task.sources.min_items; index += 1) {
     const slot = page.getByTestId(`source-path-${index}`);
-    if ((await slot.count()) === 0) await page.getByTestId("add-source").click();
+    if ((await slot.count()) === 0)
+      await page.getByTestId("add-source").click();
     await page
       .getByTestId(`source-path-${index}`)
       .fill(paths[index % paths.length]);

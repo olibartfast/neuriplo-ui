@@ -43,6 +43,36 @@ npm run dev:web
 npm run dev:server
 ```
 
+Both servers bind `127.0.0.1`. They proxy `/api` to an adapter that browses and
+reads this machine's filesystem and spawns processes on it, so serving them to
+a network is opt-in: set `NEURIPLO_UI_HOST=0.0.0.0` when you mean it.
+
+### Gates
+
+```bash
+npm run lint       # formatting, lint, and import order, reported not rewritten
+npm run format     # the same pass, applied
+npm run typecheck  # web, adapter, and the E2E harness
+npm test           # unit tests for the web app and the adapter
+npm run test:e2e   # the browser matrix
+```
+
+`npm run typecheck` covers the E2E harness and the adapter's tests as well as
+the two applications. Neither of those is compiled by a build — Playwright and
+`tsx` both strip types without checking them — so this is the only thing that
+looks at them.
+
+### Dev container
+
+`.devcontainer/` is optional and exists for one reason: it ships the browsers
+and system libraries the E2E suite needs, so setup is `npm ci` with no
+`playwright install --with-deps` and no root on the host. It runs as the
+image's non-root `ubuntu` user, so nothing it writes into the workspace comes
+back owned by root, and it raises `/dev/shm` past the 64 MB Docker default that
+Chromium runs out of. It does not help with the real producer —
+`neuriplo-infer`, its weights, and `neuriplo-kserve-runtime` are built
+elsewhere and still have to be pointed at.
+
 The local adapter exposes `GET /api/capabilities`, `POST /api/runs`, and
 `GET /api/runs/:runId/artifacts/*`. It invokes
 `$NEURIPLO_INFER_BIN --capabilities` with an argument array and validates the
@@ -234,6 +264,7 @@ for the two servers.
 - [Phase 4 results and diagnostics plan](specs/phase-4-results-diagnostics.md)
 - [Phase 5 E2E matrix plan](specs/phase-5-e2e-matrix.md)
 - [Phase 6 remote and benchmark plan](specs/phase-6-remote-benchmark.md)
+- [Phase 7 packaging and CI plan](specs/phase-7-packaging-ci.md)
 
 ## Status
 
@@ -264,7 +295,18 @@ per structural family runs through the browser, along with each advertised
 local backend and the client-server workflow. GitHub Actions runs the same
 gates.
 
-Two limits are deliberate. Without a remote runtime, client-server execution
-proves the UI and adapter halves and not the server's; and pixel-level
-comparison of rendered predictions stays out, because the fixture producer
-renders nothing. Both belong to Phase 6.
+One limit is deliberate and remains: pixel-level comparison of rendered
+predictions stays out, because the fixture producer renders nothing.
+
+Phase 7 is complete. Every line of TypeScript is now type-checked by a gate
+rather than only the lines a build happens to compile — which had left the E2E
+harness and the adapter's own tests, about a third of the repository, checked by
+nothing. One tool formats and lints, its findings were fixed rather than
+suppressed, and CI runs those gates in a job of their own so a style failure is
+reported in seconds instead of from behind the browser matrix.
+
+Both conditional roadmap items are answered rather than left open. The dev
+container earns its place by removing the one setup step that needs root. Release
+packaging belongs in `neuriplo-platform`: this repository produces nothing anyone
+installs, and its adapter exists to expose a developer's own machine to a browser
+on that same machine.

@@ -1,5 +1,5 @@
-import type { RunResult } from "./run.js";
 import { describeExecution, formatDuration, labelForStage } from "./results.js";
+import type { RunResult } from "./run.js";
 
 /**
  * Putting runs side by side.
@@ -51,7 +51,10 @@ const STAGE_KEYS = [
  */
 function extractors(): Extractor[] {
   const rows: Extractor[] = [
-    { label: "Status", value: (run) => (run.status === "success" ? "Succeeded" : "Failed") },
+    {
+      label: "Status",
+      value: (run) => (run.status === "success" ? "Succeeded" : "Failed"),
+    },
     { label: "Task", value: (run) => run.task },
     { label: "Model", value: (run) => run.model },
     { label: "Execution", value: (run) => describeExecution(run.execution) },
@@ -77,14 +80,27 @@ function extractors(): Extractor[] {
   }
 
   rows.push(
-    { label: "Samples", value: (run) => run.metrics?.samples ?? null, format: String },
-    { label: "Frames", value: (run) => run.metrics?.frames ?? null, format: String },
+    {
+      label: "Samples",
+      value: (run) => run.metrics?.samples ?? null,
+      format: String,
+    },
+    {
+      label: "Frames",
+      value: (run) => run.metrics?.frames ?? null,
+      format: String,
+    },
     {
       label: "Throughput",
       value: (run) => run.metrics?.throughput_per_second ?? null,
-      format: (value) => `${Number(value) >= 100 ? Number(value).toFixed(0) : Number(value).toFixed(2)} /s`,
+      format: (value) =>
+        `${Number(value) >= 100 ? Number(value).toFixed(0) : Number(value).toFixed(2)} /s`,
     },
-    { label: "Artifacts", value: (run) => run.artifacts.length, format: String },
+    {
+      label: "Artifacts",
+      value: (run) => run.artifacts.length,
+      format: String,
+    },
     {
       label: "Failure stage",
       value: (run) => run.error?.stage ?? null,
