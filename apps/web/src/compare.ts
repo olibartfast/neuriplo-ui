@@ -128,21 +128,57 @@ export function compareRuns(runs: readonly RunResult[]): ComparisonRow[] {
   return rows;
 }
 
+/**
+ * The exact invocation a run was.
+ *
+ * The command is the authority, because it is the argument array the adapter
+ * actually spawned: it carries the source, every parameter, and the model
+ * selector. Task and execution are included alongside it because a backend is
+ * validated and echoed back rather than passed on the command line, so two
+ * runs can share a command and still have run differently.
+ */
+function invocationOf(run: RunResult): string {
+  return JSON.stringify([
+    run.task,
+    run.model,
+    describeExecution(run.execution),
+    run.command.bin,
+    run.command.args,
+  ]);
+}
+
+/**
+ * Whether these runs are repetitions of one thing.
+ *
+ * Anything that changes the command changes the configuration — a different
+ * source, threshold, or endpoint included. Calling those "the same" would put
+ * a summary's name on statistics that describe no single thing.
+ */
+export function sameConfiguration(runs: readonly RunResult[]): boolean {
+  if (runs.length < 2) return true;
+  const first = invocationOf(runs[0]);
+  return runs.every((run) => invocationOf(run) === first);
+}
+
 /** A short caption naming what is being compared, without interpreting it. */
 export function describeComparison(runs: readonly RunResult[]): string {
-  const executions = new Set(runs.map((run) => run.execution.workflow));
-  const models = new Set(runs.map((run) => run.model));
-  const backends = new Set(
-    runs.map((run) => run.execution.backend).filter((backend) => backend !== null),
-  );
-
-  const varying: string[] = [];
-  if (executions.size > 1) varying.push("execution");
-  if (models.size > 1) varying.push("model");
-  if (backends.size > 1) varying.push("backend");
-
-  if (varying.length === 0) {
+  if (sameConfiguration(runs)) {
     return `${runs.length} runs of the same configuration.`;
   }
+
+  const varies = (of: (run: RunResult) => string) =>
+    new Set(runs.map(of)).size > 1;
+
+  const varying: string[] = [];
+  if (varies((run) => run.task)) varying.push("task");
+  if (varies((run) => run.model)) varying.push("model");
+  // describeExecution carries workflow, backend, and protocol/transport, so a
+  // pair differing only in transport is named here rather than passed over.
+  if (varies((run) => describeExecution(run.execution))) {
+    varying.push("execution");
+  }
+  // Whatever is left is in the command: a source, a threshold, an endpoint.
+  if (varying.length === 0) varying.push("arguments");
+
   return `${runs.length} runs differing in ${varying.join(" and ")}.`;
 }

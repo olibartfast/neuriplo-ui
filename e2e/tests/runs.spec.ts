@@ -458,6 +458,74 @@ test("completes a client-server run against the deterministic runtime", async ({
   await expect(page.locator('[data-testid^="artifact-preview-"]').first()).toBeVisible();
 });
 
+test("holds the controls until every run in a batch has finished", async ({
+  page,
+}) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Each run is delayed so the gap between them is observable: a finished run
+  // leaves the live state "done" while later ones are still to come, which is
+  // exactly when the controls must stay held.
+  await page.route("**/api/runs", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.continue();
+  });
+
+  await configureRun(page, capabilities, { task });
+  await page.getByTestId("repeat").fill("2");
+  await page.getByTestId("run").click();
+
+  const entries = page.locator('[data-testid^="history-entry-"]');
+  await expect(entries).toHaveCount(1, { timeout: 30_000 });
+
+  // The first run has landed and the second has not started. Launching another
+  // batch here would create exactly the device contention sequencing prevents.
+  await expect(page.getByTestId("run")).toBeDisabled();
+  await expect(page.getByTestId("repeat")).toBeDisabled();
+  await expect(page.getByTestId("run")).toContainText("of 2");
+
+  await expect(entries).toHaveCount(2, { timeout: 30_000 });
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("shows a rejection that stopped a batch part-way", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // The first run succeeds, the second is refused.
+  let seen = 0;
+  await page.route("**/api/runs", async (route) => {
+    seen += 1;
+    if (seen === 1) return route.continue();
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "error",
+        error: { code: "invalid_source", message: "Source path does not exist" },
+      }),
+    });
+  });
+
+  await configureRun(page, capabilities, { task });
+  await page.getByTestId("repeat").fill("2");
+  await page.getByTestId("run").click();
+
+  // The batch stopped early, and saying so outranks continuing to display the
+  // run that did succeed.
+  await expect(page.getByTestId("run-status")).toHaveText("Rejected", {
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId("run-error")).toContainText(
+    "Source path does not exist",
+  );
+
+  // The successful run is still retained; it is simply not what is shown.
+  await expect(page.locator('[data-testid^="history-entry-"]')).toHaveCount(1);
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
 
 for (const family of FAMILIES) {

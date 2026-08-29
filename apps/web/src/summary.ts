@@ -1,5 +1,6 @@
 import type { RunResult } from "./run.js";
 import { describeExecution, formatDuration, labelForStage } from "./results.js";
+import { sameConfiguration } from "./compare.js";
 
 /**
  * Summarizing a set of runs.
@@ -91,14 +92,12 @@ function measurements(): Measurement[] {
 export function summarize(runs: readonly RunResult[]): RunSummary | null {
   if (runs.length < 2) return null;
 
+  // Repetitions of one invocation, which means the same command as well as the
+  // same task, model, and execution: a different source or threshold is a
+  // different thing to measure, however similar it looks in the header.
+  if (!sameConfiguration(runs)) return null;
+
   const first = runs[0];
-  const homogeneous = runs.every(
-    (run) =>
-      run.task === first.task &&
-      run.model === first.model &&
-      describeExecution(run.execution) === describeExecution(first.execution),
-  );
-  if (!homogeneous) return null;
 
   const rows: SummaryRow[] = [];
   for (const measurement of measurements()) {

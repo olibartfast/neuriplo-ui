@@ -109,6 +109,39 @@ test("refuses to aggregate across different configurations", () => {
   );
 });
 
+test("refuses to aggregate runs whose invocation differed", () => {
+  const base = run({
+    run_id: "a",
+    command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] },
+  });
+
+  // Task, model, and execution all match, so a check on those alone would
+  // combine these and label the result "one configuration".
+  assert.equal(
+    summarize([
+      base,
+      run({
+        run_id: "b",
+        command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/b.png"] },
+      }),
+    ]),
+    null,
+  );
+  assert.equal(
+    summarize([
+      base,
+      run({
+        run_id: "c",
+        command: {
+          bin: "/opt/x",
+          args: ["--type=yolo26", "--min_confidence=0.9", "--source=/a.png"],
+        },
+      }),
+    ]),
+    null,
+  );
+});
+
 test("summarizes a producer measurement over the runs that supplied it", () => {
   const summary = summarize([
     run({ run_id: "a", metrics: metrics({ wall_time_ms: 50 }) }),
