@@ -139,6 +139,7 @@ npm test
 - [Tech stack](specs/tech-stack.md)
 - [Roadmap](specs/roadmap.md)
 - [Phase 4 results and diagnostics plan](specs/phase-4-results-diagnostics.md)
+- [Phase 5 E2E matrix plan](specs/phase-5-e2e-matrix.md)
 
 ## Status
 
