@@ -183,7 +183,7 @@ Implementation contract: [Phase 5 — Real E2E matrix](phase-5-e2e-matrix.md).
 - [x] Add deterministic fixture assets.
 - [x] Test at least one pipeline per major task family.
 - [x] Test local backend switching when CI runners support the backend.
-- [ ] Test client-server execution against a deterministic test runtime.
+- [x] Test client-server execution against a deterministic test runtime.
 - [x] Assert output artifact creation.
 - [x] Assert structured result semantics rather than only HTTP success.
 - [x] Store Playwright traces and logs on failure.
@@ -221,11 +221,44 @@ advertising a single backend, which is what every current build does.
 
 ## Phase 6 — Remote inference and benchmark workflows
 
-- [ ] Expose client-server endpoint/model/version/transport configuration.
-- [ ] Show remote server metadata and advertised platform.
-- [ ] Compare local and remote inference runs.
-- [ ] Add repeated benchmark runs and summary statistics.
-- [ ] Add a compact backend/model comparison view.
+Implementation contract: [Phase 6 — Remote inference and benchmark workflows](phase-6-remote-benchmark.md).
+
+- [x] Expose client-server endpoint/model/version/transport configuration.
+- [x] Show remote server metadata and advertised platform.
+- [x] Compare local and remote inference runs.
+- [x] Add repeated benchmark runs and summary statistics.
+- [x] Add a compact backend/model comparison view.
+
+Runs are retained in the page so more than one is alive at a time, which is what
+comparison, repetition, and the local-versus-remote question all needed first.
+Comparison marks what differed and stops there: no speedup, no winner, no
+cross-machine normalization, because two runs on different executions differ in
+ways those numbers do not explain.
+
+Repetition is the honest half of the benchmark item. The contract advertises
+`benchmark` and `iterations`, but the run report publishes a single observation
+with nothing per-iteration in it, so a percentile over a producer's own loop
+would have to be invented. What the UI does instead is launch N whole runs,
+sequentially, and summarize what they measured — stated as a summary over runs
+rather than over iterations. Per-iteration statistics remain a producer contract
+extension, exactly like Phase 4's Slice B.
+
+Remote metadata is the adapter's only fetch of a browser-supplied URL, so it is
+confined by `NEURIPLO_UI_REMOTE_ALLOW`, defaulting to loopback, with redirects
+refused and the response bounded. What comes back is displayed and never used to
+narrow a selection: the capabilities contract governs what may be selected, and
+a remote server is not a second source of it.
+
+The dependency Phase 5 deferred is now met. `NEURIPLO_UI_E2E_RUNTIME` points the
+harness at a built `neuriplo-kserve-runtime`, whose stub backend serves KServe
+V2 without a model, and a client-server run completes through the browser
+against it. Without one, a fixture responder still answers the metadata paths.
+
+What stays opt-in is the full round trip, and for a contract reason: the stub
+serves fixed tensor shapes, and nothing advertises what tensors a task expects,
+so the suite cannot choose a compatible selector without encoding producer
+knowledge. `NEURIPLO_UI_E2E_REMOTE_MODEL` lets the operator name one, and the
+run is then required to succeed.
 
 ## Phase 7 — Packaging and CI integration
 

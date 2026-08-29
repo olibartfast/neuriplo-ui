@@ -20,7 +20,12 @@ import {
   type Selection,
 } from "./selection.js";
 import { RunFailedError, startRun } from "./run.js";
+import { RemotePanel } from "./RemoteView.js";
+import { remoteParameters } from "./remote.js";
 import { RunPanel, type RunState } from "./RunView.js";
+import { HistoryPanel } from "./HistoryView.js";
+import { ComparePanel } from "./CompareView.js";
+import { entryFor, remember, type HistoryEntry } from "./history.js";
 import {
   DirectoryListingError,
   formatBytes,
@@ -28,6 +33,12 @@ import {
   type DirectoryEntry,
   type DirectoryListing,
 } from "./files.js";
+
+/**
+ * Ceiling on a repetition. Every run keeps its whole stdout and stderr in the
+ * page and a directory on disk, so the count stays something a person chose.
+ */
+const MAX_REPEAT = 20;
 
 type DiscoveryState =
   | { status: "loading" }
@@ -112,6 +123,20 @@ function Configurator({
 }) {
   const [desired, setDesired] = useState<Partial<Selection>>({});
   const [run, setRun] = useState<RunState>({ status: "idle" });
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Which retained run the panel is showing. Null means the live one, which is
+  // what a fresh page, a running run, and a rejected request all are.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which runs are being compared, which is a separate choice from which run
+  // is displayed: comparing two should not stop you looking at a third.
+  const [comparedIds, setComparedIds] = useState<string[]>([]);
+  const [repeat, setRepeat] = useState(1);
+  // Set for the whole batch, not just between requests: each finished run
+  // leaves the live state "done" while later ones are still to come, so this
+  // is what knows a batch is still in flight.
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  );
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -136,6 +161,7 @@ function Configurator({
     });
 
   const workflows = capabilities.execution.workflows;
+  const remote = remoteParameters(capabilities, workflow);
   const missing = [
     ...(!modelSelectorValid ? ["model"] : []),
     ...missingRequirements(resolved),
@@ -143,11 +169,60 @@ function Configurator({
   const required = parameters.filter((parameter) => parameter.required);
   const optional = parameters.filter((parameter) => !parameter.required);
 
-  const launch = () => {
+  // A selected history entry replaces what the panel shows. The live state
+  // wins whenever nothing is selected, so a launch always displays itself.
+  // A batch holds the controls until every run in it has finished, because a
+  // finished run leaves the live state "done" while later ones are pending.
+  const busy = run.status === "running" || progress !== null;
+
+  const selected = entryFor(history, selectedId);
+  // A live error outranks a selection: a rejection that stopped a batch has to
+  // be visible, not hidden behind the last run that did succeed.
+  const shown: RunState =
+    selected && run.status !== "running" && run.status !== "error"
+      ? { status: "done", run: selected.run }
+      : run;
+
+  // Compared runs keep the order they were run in, oldest first, so the
+  // columns read left to right the way the runs happened.
+  const compared = history
+    .filter((entry) => comparedIds.includes(entry.run.run_id))
+    .map((entry) => entry.run)
+    .reverse();
+
+  const toggleCompare = (runId: string) =>
+    setComparedIds((current) =>
+      current.includes(runId)
+        ? current.filter((id) => id !== runId)
+        : [...current, runId],
+    );
+
+  /**
+   * Runs the current configuration `repeat` times, one after another.
+   *
+   * Sequential rather than concurrent on purpose: parallel runs would contend
+   * for the same device and make every measurement they produced meaningless.
+   * A repetition stops at the first rejection, because the adapter refusing
+   * the request means the remaining runs would be refused identically.
+   */
+  const launch = async () => {
+    const total = Math.max(1, Math.min(repeat, MAX_REPEAT));
     setRun({ status: "running" });
-    startRun(resolved)
-      .then((result) => setRun({ status: "done", run: result }))
-      .catch((error: unknown) => {
+    setSelectedId(null);
+    setProgress({ done: 0, total });
+
+    const launched: string[] = [];
+    for (let index = 0; index < total; index += 1) {
+      try {
+        const result = await startRun(resolved);
+        setRun({ status: "done", run: result });
+        // A run that ran is retained and becomes the selection; a rejection
+        // never gets here, because it has nothing to compare.
+        setHistory((entries) => remember(entries, result));
+        setSelectedId(result.run_id);
+        launched.push(result.run_id);
+        setProgress({ done: index + 1, total });
+      } catch (error: unknown) {
         const failure =
           error instanceof RunFailedError
             ? error
@@ -160,7 +235,17 @@ function Configurator({
           code: failure.code,
           message: failure.message,
         });
-      });
+        // A batch that stopped early must say so. Leaving an earlier run
+        // selected would keep showing a success the batch no longer had.
+        setSelectedId(null);
+        break;
+      }
+    }
+
+    setProgress(null);
+    // A repetition is a set worth looking at together, so it selects itself
+    // for comparison rather than making the user tick each run.
+    if (launched.length > 1) setComparedIds(launched);
   };
 
   return (
@@ -256,6 +341,22 @@ function Configurator({
           />
         )}
 
+        {/* Only the client-server workflow addresses a server, and only a
+            contract that advertises a url parameter says where. */}
+        {remote.endpoint !== null && (
+          <RemotePanel
+            endpoint={selection.parameters[remote.endpoint] ?? ""}
+            model={
+              remote.model ? (selection.parameters[remote.model] ?? null) : null
+            }
+            version={
+              remote.version
+                ? (selection.parameters[remote.version] ?? null)
+                : null
+            }
+          />
+        )}
+
         {optional.length > 0 && (
           <details className="advanced">
             <summary data-testid="advanced-toggle">
@@ -269,22 +370,61 @@ function Configurator({
           </details>
         )}
 
-        <button
-          data-testid="run"
-          type="button"
-          disabled={missing.length > 0 || run.status === "running"}
-          onClick={launch}
-        >
-          {run.status === "running" ? "Running…" : "Run inference"}
-        </button>
+        <div className="launch">
+          <button
+            data-testid="run"
+            type="button"
+            disabled={missing.length > 0 || busy}
+            onClick={() => void launch()}
+          >
+            {busy
+              ? progress && progress.total > 1
+                ? `Running ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
+                : "Running…"
+              : repeat > 1
+                ? `Run ${repeat} times`
+                : "Run inference"}
+          </button>
+          <label className="repeat">
+            <span>Repeat</span>
+            <input
+              data-testid="repeat"
+              type="number"
+              min={1}
+              max={MAX_REPEAT}
+              value={repeat}
+              disabled={busy}
+              onChange={(event) =>
+                setRepeat(
+                  Math.max(
+                    1,
+                    Math.min(MAX_REPEAT, Number(event.target.value) || 1),
+                  ),
+                )
+              }
+            />
+          </label>
+        </div>
         <p className="hint" data-testid="run-hint">
           {missing.length > 0
             ? `Provide ${missing.map(labelFor).join(", ")} before running.`
-            : "Launches neuriplo-infer through the local adapter."}
+            : repeat > 1
+              ? `Launches ${repeat} runs one after another, so they do not contend for the same device.`
+              : "Launches neuriplo-infer through the local adapter."}
         </p>
       </section>
 
-      <RunPanel state={run} capabilities={capabilities} />
+      <RunPanel state={shown} capabilities={capabilities} />
+
+      <HistoryPanel
+        history={history}
+        selectedId={selectedId}
+        comparedIds={comparedIds}
+        onSelect={setSelectedId}
+        onToggleCompare={toggleCompare}
+      />
+
+      <ComparePanel runs={compared} />
     </>
   );
 }

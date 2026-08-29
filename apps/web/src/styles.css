@@ -266,3 +266,51 @@ pre.json, pre.log-body {
   font-weight: 600;
 }
 .log pre { margin-top: 8px; }
+
+/* Run history: one row per completed run, newest first. */
+.history { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.history-entry {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 12px;
+  align-items: baseline;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: .85rem;
+}
+.history-what { font-weight: 600; }
+.history-how, .history-when { font-size: .8rem; opacity: .75; }
+@media (max-width: 640px) {
+  .history-entry { grid-template-columns: auto 1fr; }
+}
+
+.history-row { display: flex; align-items: stretch; gap: 8px; }
+.history-row.selected { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+.history-compare { display: flex; align-items: center; padding: 0 4px; }
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0; border: 0;
+  clip-path: inset(50%);
+  overflow: hidden; white-space: nowrap;
+}
+
+/* Comparison: a wide table scrolls inside itself rather than the page. */
+.comparison-scroll { overflow-x: auto; }
+.comparison { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.comparison th, .comparison td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(128, 138, 165, .25);
+  white-space: nowrap;
+}
+.comparison th[scope="row"] { font-weight: 500; }
+.comparison tr.differs th[scope="row"] { font-weight: 700; }
+.comparison tr.differs td { font-weight: 600; }
+.comparison td.absent { opacity: .55; }
+
+.launch { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.launch .repeat { display: flex; align-items: center; gap: 8px; margin: 0; }
+.launch .repeat span { font-size: .8rem; color: #6d7893; }
+.launch .repeat input { width: 72px; }
