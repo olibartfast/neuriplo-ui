@@ -447,7 +447,13 @@ function SourcePaths({
     <div className="parameters">
       <div className="grid">
         {selection.sources.map((source, index) => (
-          <label key={index}>
+          <label
+            // These are positional slots rather than a list of things: the
+            // contract's min_items/max_items decide how many inputs a task
+            // gets, nothing reorders them, and there is no other id to key on.
+            // biome-ignore lint/suspicious/noArrayIndexKey: the slot's identity is its position
+            key={index}
+          >
             <span>
               {labelFor(selection.sourceType)}
               {selection.sources.length > 1 ? ` ${index + 1}` : ""}
@@ -835,6 +841,11 @@ function FileBrowser({
   };
 
   return (
+    // The backdrop is a pointer-only shortcut for closing the dialog.
+    // Keyboard users have the Escape handler on the dialog below, so giving
+    // this element a role and key handler of its own would add a tab stop that
+    // announces nothing.
+    // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only shortcut, Escape covers the keyboard
     <div
       className="browser-backdrop"
       role="presentation"

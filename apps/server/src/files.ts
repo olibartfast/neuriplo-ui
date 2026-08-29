@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -95,7 +96,7 @@ export async function listDirectory(
     );
   }
 
-  let dirEntries;
+  let dirEntries: Dirent[];
   try {
     dirEntries = await readdir(real, { withFileTypes: true });
   } catch (cause) {

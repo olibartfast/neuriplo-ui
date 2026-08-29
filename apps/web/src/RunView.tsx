@@ -317,6 +317,11 @@ export function Artifacts({ artifacts }: { artifacts: RunArtifact[] }) {
               </a>
             )}
             {artifact.media_type.startsWith("video/") && (
+              // The artifact is a video neuriplo-infer rendered from the
+              // run's own input. No track exists to point at, and an empty one
+              // would assert there is nothing to hear — a claim about the
+              // source that this UI is in no position to make.
+              // biome-ignore lint/a11y/useMediaCaption: a rendered artifact has no caption track to offer
               <video
                 data-testid={`artifact-preview-${artifact.name}`}
                 className="artifact-preview"
