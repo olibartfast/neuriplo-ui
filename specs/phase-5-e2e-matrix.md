@@ -137,11 +137,23 @@ Preview needs the same `/api` proxy the dev server has; add it to
 
 ### A4. Retain diagnostics on failure
 
-Set `trace`, `screenshot`, and `video` to retain on failure, pipe both servers'
-output, and keep the HTML report. A failing CI run must be diagnosable from its
-artifacts alone.
+Set `trace`, `screenshot`, and `video` to retain on failure, write both
+servers' output to files, and keep the HTML report. A failing CI run must be
+diagnosable from its artifacts alone — and Playwright's own `stdout: "pipe"`
+only forwards to the runner's terminal, so each server's output is also teed to
+`e2e/test-results/<name>.log`, which is outside the directory Playwright cleans
+and inside the one CI uploads.
 
-### A5. Verify Slice A
+### A5. Keep the harness off the network
+
+The harness serves a page that proxies to an adapter that spawns binaries and
+turns any source path it is given into an artifact the browser can fetch. Both
+servers therefore bind `127.0.0.1` — `vite preview` is invoked directly rather
+than through the workspace script, which binds `0.0.0.0` — and the adapter runs
+with `NEURIPLO_UI_SOURCE_ROOT` set to the browse root, so a source outside it is
+refused rather than copied out.
+
+### A6. Verify Slice A
 
 The existing suite passes unchanged against the fixture producer. That is the
 acceptance criterion for the slice: the tests were written against the contract,
@@ -194,6 +206,13 @@ exercises the five above.
 Assert artifact creation for every family and structured results for the
 families that advertise `output_format`.
 
+Against a real producer the committed placeholders cannot succeed, and
+accepting any failure would keep the suite green against a binary that rejects
+every command line. A run must therefore fail *past configuration*, in a stage
+the producer attributes to the inputs it was handed. Real inputs supplied
+through `NEURIPLO_UI_E2E_IMAGE`, `NEURIPLO_UI_E2E_VIDEO`, and
+`NEURIPLO_UI_E2E_WEIGHTS` turn the same tests back into success assertions.
+
 Slice B gates: as Slice A, plus the matrix passing against the fixture.
 
 ## Slice C — Execution coverage
@@ -237,7 +256,9 @@ Phase 5 acceptance requires:
 4. A successful run is asserted by artifact, structured result, and metrics.
 5. A failed run is asserted by producer stage, exit code, and stderr.
 6. No test asserts a task-specific fact the frontend is not allowed to know.
-7. A failure leaves a trace, a screenshot, and both server logs.
+7. A failure leaves a trace, a screenshot, and both server logs as files.
+8. Neither server is reachable off the loopback interface, and no run can read
+   a file outside the configured source root.
 
 ## Explicitly deferred
 

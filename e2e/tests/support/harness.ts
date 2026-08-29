@@ -21,13 +21,33 @@ const assets = join(
   "../../fixtures/assets",
 );
 
+/**
+ * Real inputs, when the operator supplied them.
+ *
+ * The committed assets are placeholders: bytes with the right names, which a
+ * real producer rejects. An operator running against a real binary can point
+ * these at inputs it can actually load, and the suite then demands the runs
+ * succeed instead of demanding they fail in a known way. They have to live
+ * under `NEURIPLO_UI_BROWSE_ROOT`, which is what confines sources.
+ */
+const REAL = {
+  image: process.env.NEURIPLO_UI_E2E_IMAGE?.trim(),
+  video: process.env.NEURIPLO_UI_E2E_VIDEO?.trim(),
+  weights: process.env.NEURIPLO_UI_E2E_WEIGHTS?.trim(),
+};
+
 export const FIXTURES = {
-  image: join(assets, "sample-image.png"),
-  secondImage: join(assets, "second-image.png"),
-  video: join(assets, "sample-video.mp4"),
-  weights: join(assets, "fixture-weights.onnx"),
+  image: REAL.image || join(assets, "sample-image.png"),
+  secondImage: REAL.image || join(assets, "second-image.png"),
+  video: REAL.video || join(assets, "sample-video.mp4"),
+  weights: REAL.weights || join(assets, "fixture-weights.onnx"),
   failInStage: (stage: string) => join(assets, `fail-${stage}.png`),
 };
+
+/** True when the operator supplied inputs a real producer can actually load. */
+export function hasRealAssets(): boolean {
+  return Boolean(REAL.image && REAL.weights);
+}
 
 /** What a required free-text parameter is filled with. */
 export const PROMPT = "fixture";
@@ -188,6 +208,42 @@ async function choose(page: Page, testId: string, value: string): Promise<void> 
     return;
   }
   await control.selectOption(value);
+}
+
+/**
+ * What a run is required to end in.
+ *
+ * The fixture producer succeeds, and so must a real one given real inputs. A
+ * real producer handed the committed placeholders cannot succeed — but it must
+ * still fail in a *particular* way: past configuration, on the inputs it was
+ * knowingly given. Accepting any failure would keep the suite green against a
+ * binary that rejects every command line the adapter builds, which is exactly
+ * the regression these tests exist to catch.
+ */
+export async function expectRunOutcome(
+  page: Page,
+  capabilities: NeuriploCapabilities,
+  status: string,
+  options: { remote?: boolean } = {},
+): Promise<void> {
+  // A remote workflow needs a server as well as inputs, and this suite has
+  // none: proving that half is Phase 6's.
+  const mustSucceed =
+    isFixtureProducer(capabilities) || (hasRealAssets() && !options.remote);
+
+  if (mustSucceed) {
+    expect(status).toBe("Succeeded");
+    return;
+  }
+
+  expect(status).toBe("Failed");
+  if (capabilities.diagnostics?.run_report) {
+    // Placeholder weights fail in model load; a placeholder source fails in
+    // source or preprocess. Configuration means the command was wrong.
+    await expect(page.getByTestId("run-error-stage")).toHaveText(
+      /Model Load|Source|Preprocess/,
+    );
+  }
 }
 
 /** One source slot per source the task advertises, filled with real files. */
