@@ -211,7 +211,9 @@ suite at inputs a real binary can load and the same tests demand success:
 | `NEURIPLO_UI_E2E_IMAGE` | Image source used for every image-sourced family. |
 | `NEURIPLO_UI_E2E_VIDEO` | Video source. |
 | `NEURIPLO_UI_E2E_WEIGHTS` | Weights for every parameter the contract types as a path. |
-| `NEURIPLO_UI_E2E_ENDPOINT` | Client-server endpoint. Defaults to the fixture KServe responder the harness starts. |
+| `NEURIPLO_UI_E2E_ENDPOINT` | Client-server endpoint. Defaults to the remote the harness starts. |
+| `NEURIPLO_UI_E2E_RUNTIME` | A built `neuriplo-kserve-runtime`. Started as the remote instead of the fixture responder, so client-server runs reach a real server. |
+| `NEURIPLO_UI_E2E_REMOTE_MODEL` | Local model selector for the full client-server round trip. The runtime's stub serves fixed tensor shapes and no contract advertises what a task expects of them, so the operator names a selector that fits. |
 | `NEURIPLO_UI_BROWSE_ROOT` | Directory the picker browses and sources are confined to; the assets above must live under it. |
 
 The harness binds both servers to `127.0.0.1` and confines sources to the
@@ -248,10 +250,11 @@ Slice B added the producer contract it was waiting on: `neuriplo-infer` now
 publishes versioned per-stage metrics and a typed failure stage, and this
 repository consumes them. Nothing is scraped from log text.
 
-Phase 6 is in progress: run history, comparison, N-run summaries, and remote
-server metadata are implemented; the remaining work is pointing the suite at a
-real `neuriplo-kserve-runtime` so client-server execution is proven against a
-server rather than a metadata responder.
+Phase 6 is complete. Runs are retained and comparable, a configuration can be
+repeated and summarized, and a client-server endpoint describes itself from
+behind an allowlist. Client-server execution is now exercised against a real
+`neuriplo-kserve-runtime` — the dependency Phase 5 deferred — with a fixture
+KServe responder standing in when no runtime is configured.
 
 Phase 5 is complete. The harness starts the web and server processes itself,
 supplies its own producer, and asserts what a run meant: a successful run by

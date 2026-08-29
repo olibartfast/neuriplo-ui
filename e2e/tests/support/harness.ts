@@ -52,6 +52,52 @@ export function hasRealAssets(): boolean {
 /** What a required free-text parameter is filled with. */
 export const PROMPT = "fixture";
 
+/**
+ * The model name both remotes publish — the fixture responder and a real
+ * `neuriplo-kserve-runtime` the harness starts — so a test never has to know
+ * which one is answering.
+ */
+export const REMOTE_MODEL = "yolo26";
+
+/** Where the harness's remote listens, whichever of the two is running. */
+export function remoteEndpoint(): string {
+  return (
+    process.env.NEURIPLO_UI_E2E_ENDPOINT?.trim() ||
+    `http://127.0.0.1:${process.env.NEURIPLO_UI_REMOTE_PORT ?? 5175}`
+  );
+}
+
+/**
+ * What the remote says about itself, read by the test process directly.
+ *
+ * Lets an assertion compare the panel against the server rather than against a
+ * name written into the suite — which is what keeps it true whether the fixture
+ * responder or a real `neuriplo-kserve-runtime` is answering.
+ */
+export async function remoteServerName(): Promise<string | null> {
+  try {
+    const response = await fetch(`${remoteEndpoint()}/v2`);
+    const payload = (await response.json()) as { name?: string };
+    return typeof payload.name === "string" ? payload.name : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The local model selector to drive a full client-server round trip with, when
+ * the operator has supplied one.
+ *
+ * The runtime's stub backend serves fixed tensor shapes, so whether a round
+ * trip completes depends on what the selected task expects of them — and
+ * nothing in the capabilities contract advertises that. Rather than encode a
+ * producer's task semantics here, the operator names a selector they know fits
+ * and the suite then requires the run to succeed.
+ */
+export function remoteRoundTripModel(): string | null {
+  return process.env.NEURIPLO_UI_E2E_REMOTE_MODEL?.trim() || null;
+}
+
 /** The image fixture's own dimensions, which a rendered artifact must match. */
 export const IMAGE_FIXTURE_SIZE = { width: 64, height: 64 };
 
@@ -116,6 +162,8 @@ export function taskForFamily(
 
 export type Configuration = {
   task: CapabilityTask;
+  /** Defaults to the task's first advertised model. */
+  model?: string;
   /** Defaults to the workflow the contract advertises first, preferring local. */
   workflow?: string;
   backend?: string;
@@ -136,7 +184,9 @@ export async function configureRun(
   configuration: Configuration,
 ): Promise<void> {
   const { task } = configuration;
-  const model = task.models[0];
+  const model =
+    task.models.find((entry) => entry.id === configuration.model) ??
+    task.models[0];
 
   await page.getByTestId("task").selectOption(task.id);
   await page.getByTestId("model").fill(model.id);

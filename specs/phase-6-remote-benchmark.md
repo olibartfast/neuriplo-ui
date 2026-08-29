@@ -188,11 +188,27 @@ otherwise would be the same mistake as calling wall time inference latency.
 
 ## Slice E — Tests and the deterministic remote
 
-**Status: partly implemented.** `e2e/fixtures/remote/kserve-fixture.mjs` answers
-the KServe V2 metadata paths and the harness starts it, so the metadata path is
-exercised without a network. Pointing the suite at a built
-`neuriplo-kserve-runtime` — which would close the Phase 5 item still waiting on
-it — is the remaining work, and needs that runtime built.
+**Status: implemented.** `e2e/fixtures/remote/kserve-fixture.mjs` answers the
+KServe V2 metadata paths when there is no runtime, and
+`NEURIPLO_UI_E2E_RUNTIME` points the harness at a built
+`neuriplo-kserve-runtime` instead. Its stub backend serves KServe V2 without a
+model, which is the deterministic remote Phase 5 deferred and this slice needed.
+Both publish the same model name, so no test knows which is answering, and the
+metadata assertion reads the expected name from the server rather than carrying
+one.
+
+One boundary remains, and it is a contract gap rather than missing work. The
+stub serves fixed tensor shapes, so whether a *full round trip* completes
+depends on what the selected task expects of them — and nothing in the
+capabilities contract advertises a task's expected tensors. Encoding that here
+would be exactly the producer knowledge the frontend is not allowed to hold, so
+the round-trip test is opt-in: `NEURIPLO_UI_E2E_REMOTE_MODEL` names a selector
+the operator knows fits, and the suite then requires the run to succeed rather
+than accepting any terminal state.
+
+Verified with the real producer and the real runtime: a client-server run of
+`torchvision-classifier` completes through the browser, returning a rendered
+artifact served from the run's directory.
 
 Extend the fixture producer so a client-server run is distinguishable from a
 local one, and add a fixture remote — a small KServe V2 responder — so the
