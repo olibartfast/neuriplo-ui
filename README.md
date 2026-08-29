@@ -133,6 +133,38 @@ npm run build
 npm test
 ```
 
+## End-to-end tests
+
+```bash
+npm run test:e2e
+```
+
+The suite starts what it tests: Playwright builds both apps, starts the
+adapter and a preview of the built frontend, and points `NEURIPLO_INFER_BIN`
+at a fixture producer under `e2e/fixtures/producer/`. That fixture implements
+the capabilities and run-report contracts and nothing else — it loads no model
+and predicts nothing — which is what lets the whole matrix run on a machine
+with no models, no weights, and nothing compiled. Inference itself is tested in
+`neuriplo-infer`; what is tested here is the path from a contract to a rendered
+run.
+
+Every assertion is derived from the advertised contract at runtime, so the same
+command runs against a real binary:
+
+```bash
+NEURIPLO_INFER_BIN=/path/to/neuriplo-infer npm run test:e2e
+```
+
+The two assertions that need a known output — a successful run's artifact,
+result and metrics, and a failure attributed to a named stage — check the
+advertised `producer.version` first and skip when it is not the fixture's. A
+real binary handed a placeholder for weights fails, legitimately, and a failed
+run is not a failed test.
+
+An operator already running `npm run dev` keeps their own servers and producer;
+set `CI=1` to force fresh ones. A failing test leaves a trace, a screenshot, a
+video, and both server logs under `e2e/test-results/`.
+
 ## Specifications
 
 - [Mission](specs/mission.md)
@@ -156,6 +188,15 @@ Slice B added the producer contract it was waiting on: `neuriplo-infer` now
 publishes versioned per-stage metrics and a typed failure stage, and this
 repository consumes them. Nothing is scraped from log text.
 
-Phase 5 is next: starting the web and server processes from the test harness,
-adding deterministic fixtures, and asserting result semantics rather than only
-a terminal state.
+Phase 5 is complete. The harness starts the web and server processes itself,
+supplies its own producer, and asserts what a run meant: a successful run by
+its served artifact, its structured result and its producer metrics, a failed
+one by the stage the producer named, its exit code, and its stderr. One task
+per structural family runs through the browser, along with each advertised
+local backend and the client-server workflow. GitHub Actions runs the same
+gates.
+
+Two limits are deliberate. Without a remote runtime, client-server execution
+proves the UI and adapter halves and not the server's; and pixel-level
+comparison of rendered predictions stays out, because the fixture producer
+renders nothing. Both belong to Phase 6.
