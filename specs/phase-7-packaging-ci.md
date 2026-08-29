@@ -117,15 +117,41 @@ possible, as an explicit opt-in that says what it is.
 
 ## Slice F — Answer the two open questions
 
-### F1. Docker / dev-container
+### F1. Docker / dev-container — yes, for one reason
 
 The roadmap item is conditional — *if it materially simplifies E2E setup* — so
-it needs evidence rather than a preference.
+it was settled with evidence rather than a preference.
 
-### F2. Release packaging
+Setting up this repository is `npm ci`, and then `playwright install --with-deps
+chromium`, which wants apt and root. That second step is the whole difficulty:
+fine on Ubuntu, awkward on any other Linux, and unavailable without sudo.
 
-Decide whether it belongs here or in `neuriplo-platform`, and record the
-reasoning where the next person will look for it.
+Running the suite inside `mcr.microsoft.com/playwright:v1.62.1-noble` with no
+install step at all gives 27 passed, 1 skipped — the same result as the host.
+So the container removes exactly one step, but it is the only step that needs
+privileges, and that is enough to justify a single file.
+
+The honest limit is recorded next to it: this simplifies the *fixture* path
+only. A `neuriplo-infer` built with backends, its weights, and
+`neuriplo-kserve-runtime` are built in other repositories, and nothing here can
+put them in an image.
+
+### F2. Release packaging — `neuriplo-platform`, not here
+
+This repository produces nothing anyone installs. Both packages are private and
+unpublished; the adapter spawns a local binary, browses the local filesystem,
+and is deliberately bound to loopback; and the frontend is a dev and test
+client for it. There is not even a single artifact to ship — the adapter serves
+no static files, so a built UI still needs something else to serve it.
+
+Packaging the Neuriplo *platform* — the binary, the runtime, the models — is
+`neuriplo-platform`'s concern, and the UI would be packaged there as one part
+of it if it is ever packaged at all. Deciding otherwise here would mean this
+repository shipping a server whose entire purpose is to expose a developer's
+own machine.
+
+What this repository does own is the reproducible way to *run* it, which is
+Slice F1's container and the documented commands.
 
 ## What this phase does not do
 
