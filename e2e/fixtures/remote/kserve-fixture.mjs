@@ -49,7 +49,10 @@ const server = createServer((request, response) => {
     // Only the model it actually serves; anything else is a 404, which the
     // adapter treats as "the server does not describe this model".
     return decodeURIComponent(model[1]) === MODEL.name
-      ? send(200, { ...MODEL, versions: model[2] ? [model[2]] : MODEL.versions })
+      ? send(200, {
+          ...MODEL,
+          versions: model[2] ? [model[2]] : MODEL.versions,
+        })
       : send(404, { error: "Model not found" });
   }
 

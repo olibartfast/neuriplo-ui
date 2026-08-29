@@ -102,11 +102,9 @@ export async function listDirectory(
   } catch (cause) {
     const code = (cause as NodeJS.ErrnoException).code;
     if (code === "ENOTDIR") {
-      throw new FileBrowseError(
-        "not_a_directory",
-        `Not a directory: ${real}`,
-        { cause },
-      );
+      throw new FileBrowseError("not_a_directory", `Not a directory: ${real}`, {
+        cause,
+      });
     }
     throw new FileBrowseError(
       code === "EACCES" || code === "EPERM" ? "forbidden" : "unreadable",
@@ -118,7 +116,10 @@ export async function listDirectory(
   // Directories first, then files, each alphabetically: the ordering a file
   // picker is expected to have.
   const sorted = dirEntries
-    .filter((entry) => entry.isDirectory() || entry.isFile() || entry.isSymbolicLink())
+    .filter(
+      (entry) =>
+        entry.isDirectory() || entry.isFile() || entry.isSymbolicLink(),
+    )
     .sort((left, right) => {
       const leftDirectory = left.isDirectory() ? 0 : 1;
       const rightDirectory = right.isDirectory() ? 0 : 1;

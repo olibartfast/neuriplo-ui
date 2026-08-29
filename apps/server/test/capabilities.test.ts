@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  type CapabilitiesCommandRunner,
   CapabilitiesDiscoveryError,
   discoverCapabilities,
-  runReportContract,
-  type CapabilitiesCommandRunner,
   type NeuriploCapabilities,
+  runReportContract,
 } from "../src/capabilities.js";
 
 const fixture: NeuriploCapabilities = {

@@ -1,6 +1,6 @@
-import type { PlannedRun } from "./runs.js";
 import type { RunOutcome } from "./runner.js";
 import type { RunDiagnostics } from "./runReport.js";
+import type { PlannedRun } from "./runs.js";
 
 /**
  * Shapes a finished process into the run resource the UI consumes.

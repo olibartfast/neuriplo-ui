@@ -4,31 +4,31 @@ import Fastify, { type FastifyInstance } from "fastify";
 import {
   CapabilitiesDiscoveryError,
   discoverCapabilities,
-  runReportContract,
   type NeuriploCapabilities,
+  runReportContract,
 } from "./capabilities.js";
 import {
-  FileBrowseError,
-  listDirectory,
   type BrowseOptions,
   type DirectoryListing,
+  FileBrowseError,
+  listDirectory,
 } from "./files.js";
 import {
-  RemoteMetadataError,
   fetchRemoteMetadata,
+  RemoteMetadataError,
   type RemoteOptions,
 } from "./remote.js";
-import { buildRunResponse } from "./runResponse.js";
-import { readRunDiagnostics } from "./runReport.js";
 import {
-  RunExecutionError,
   executeRun,
   mediaTypeFor,
-  resolveArtifactPath,
-  type RunOutcome,
+  RunExecutionError,
   type RunnerOptions,
+  type RunOutcome,
+  resolveArtifactPath,
 } from "./runner.js";
-import { RunRequestError, planRun } from "./runs.js";
+import { readRunDiagnostics } from "./runReport.js";
+import { buildRunResponse } from "./runResponse.js";
+import { planRun, RunRequestError } from "./runs.js";
 
 export type ServerOptions = {
   loadCapabilities?: () => Promise<NeuriploCapabilities>;
@@ -138,7 +138,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     if (!endpoint) {
       return reply
         .code(400)
-        .send(failure("invalid_endpoint", "An endpoint is required", "endpoint"));
+        .send(
+          failure("invalid_endpoint", "An endpoint is required", "endpoint"),
+        );
     }
 
     try {

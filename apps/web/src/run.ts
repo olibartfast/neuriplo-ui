@@ -125,9 +125,11 @@ export async function startRun(
   if (!response.ok) {
     const error =
       payload && typeof payload === "object" && "error" in payload
-        ? (payload as {
-            error: { code?: string; message?: string; field?: string };
-          }).error
+        ? (
+            payload as {
+              error: { code?: string; message?: string; field?: string };
+            }
+          ).error
         : null;
     throw new RunFailedError(
       error?.code ?? String(response.status),

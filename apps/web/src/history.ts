@@ -60,7 +60,10 @@ export function entryFor(
  * Deliberately coarse: the exact second a run landed is noise, and the run's
  * own duration is the number that carries meaning.
  */
-export function formatAge(receivedAt: number, now: number = Date.now()): string {
+export function formatAge(
+  receivedAt: number,
+  now: number = Date.now(),
+): string {
   const seconds = Math.max(0, Math.round((now - receivedAt) / 1000));
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
