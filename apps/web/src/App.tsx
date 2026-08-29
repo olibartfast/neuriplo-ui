@@ -21,6 +21,8 @@ import {
 } from "./selection.js";
 import { RunFailedError, startRun } from "./run.js";
 import { RunPanel, type RunState } from "./RunView.js";
+import { HistoryPanel } from "./HistoryView.js";
+import { entryFor, remember, type HistoryEntry } from "./history.js";
 import {
   DirectoryListingError,
   formatBytes,
@@ -112,6 +114,10 @@ function Configurator({
 }) {
   const [desired, setDesired] = useState<Partial<Selection>>({});
   const [run, setRun] = useState<RunState>({ status: "idle" });
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  // Which retained run the panel is showing. Null means the live one, which is
+  // what a fresh page, a running run, and a rejected request all are.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -143,10 +149,25 @@ function Configurator({
   const required = parameters.filter((parameter) => parameter.required);
   const optional = parameters.filter((parameter) => !parameter.required);
 
+  // A selected history entry replaces what the panel shows. The live state
+  // wins whenever nothing is selected, so a launch always displays itself.
+  const selected = entryFor(history, selectedId);
+  const shown: RunState =
+    selected && run.status !== "running"
+      ? { status: "done", run: selected.run }
+      : run;
+
   const launch = () => {
     setRun({ status: "running" });
+    setSelectedId(null);
     startRun(resolved)
-      .then((result) => setRun({ status: "done", run: result }))
+      .then((result) => {
+        setRun({ status: "done", run: result });
+        // A run that ran is retained and becomes the selection; a rejection
+        // below never gets here, because it has nothing to compare.
+        setHistory((entries) => remember(entries, result));
+        setSelectedId(result.run_id);
+      })
       .catch((error: unknown) => {
         const failure =
           error instanceof RunFailedError
@@ -284,7 +305,13 @@ function Configurator({
         </p>
       </section>
 
-      <RunPanel state={run} capabilities={capabilities} />
+      <RunPanel state={shown} capabilities={capabilities} />
+
+      <HistoryPanel
+        history={history}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+      />
     </>
   );
 }

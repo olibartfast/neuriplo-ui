@@ -151,6 +151,64 @@ test("reports a completed run as a reproducible report", async ({ page }) => {
   await expect(page.getByTestId("log-stdout")).toBeVisible();
 });
 
+test("retains finished runs and returns to an earlier one", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Nothing has run, so there is no history to show.
+  await expect(page.getByTestId("history")).toHaveCount(0);
+
+  await configureRun(page, capabilities, { task });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const first = await page.getByTestId("run-id").textContent();
+
+  await expect(page.getByTestId("history")).toBeVisible();
+  await expect(page.getByTestId(`history-entry-${first}`)).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // A second run of the same configuration is a second entry, not a
+  // replacement: two runs of one configuration are what a comparison needs.
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const second = await page.getByTestId("run-id").textContent();
+  expect(second).not.toBe(first);
+
+  const entries = page.locator('[data-testid^="history-entry-"]');
+  await expect(entries).toHaveCount(2);
+  // Newest first.
+  await expect(entries.first()).toHaveAttribute(
+    "data-testid",
+    `history-entry-${second}`,
+  );
+
+  // Selecting the earlier run shows that run, unchanged.
+  await page.getByTestId(`history-entry-${first}`).click();
+  await expect(page.getByTestId("run-id")).toHaveText(first!);
+  await expect(page.getByTestId(`history-entry-${first}`)).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.getByTestId("run-command")).toContainText("--type=");
+});
+
+test("never retains a request the adapter refused", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+
+  await configureRun(page, capabilities, { task });
+  // A source that does not exist is refused before anything is spawned.
+  await page.getByTestId("source-path-0").fill("/tmp/neuriplo-ui-absent-source");
+  expect(await launchRun(page)).toBe("Rejected");
+
+  // A rejection never reached the binary, so it has nothing to compare and
+  // must not appear as a run that happened.
+  await expect(page.getByTestId("history")).toHaveCount(0);
+  await expect(page.getByTestId("run-summary")).toContainText(
+    "neuriplo-infer was not started",
+  );
+});
+
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
 
 for (const family of FAMILIES) {
