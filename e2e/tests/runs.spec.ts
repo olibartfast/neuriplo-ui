@@ -269,6 +269,43 @@ test("compares two runs and marks what differed", async ({ page }) => {
   await expect(comparison).not.toContainText(/faster|slower|speedup/i);
 });
 
+test("repeats a configuration and summarizes what the runs measured", async ({
+  page,
+}) => {
+  const capabilities = await capabilitiesOf(page);
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task });
+
+  await page.getByTestId("repeat").fill("3");
+  await expect(page.getByTestId("run")).toContainText("Run 3 times");
+  await expect(page.getByTestId("run-hint")).toContainText("one after another");
+
+  await page.getByTestId("run").click();
+  // Three sequential runs, so the wait covers all of them.
+  await expect(page.getByTestId("history").locator("li")).toHaveCount(3, {
+    timeout: 120_000,
+  });
+  await expect(page.getByTestId("run-status")).toHaveText(/Succeeded|Failed/);
+
+  // A repetition selects itself for comparison: it is a set worth looking at
+  // together, and ticking each run by hand would be busywork.
+  const summary = page.getByTestId("summary");
+  await expect(summary).toBeVisible();
+  await expect(page.getByTestId("comparison-caption")).toContainText(
+    "same configuration",
+  );
+
+  const wallTime = page.getByTestId("summary-row-wall-time-whole-process");
+  await expect(wallTime).toBeVisible();
+  // Every run reported its own wall time, so all three contributed.
+  await expect(wallTime.locator("td").first()).toHaveText("3");
+
+  // The distinction the producer contract forces: this summarizes runs, not
+  // the iterations of a benchmark loop nobody published per-iteration data for.
+  await expect(page.getByText(/not over the iterations of/)).toBeVisible();
+  await expect(summary).not.toContainText(/p9[059]|percentile/i);
+});
+
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
 
 for (const family of FAMILIES) {
