@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compareRuns, describeComparison } from "../src/compare.js";
+import {
+  compareRuns,
+  describeComparison,
+  sameConfiguration,
+} from "../src/compare.js";
 import type { RunMetrics, RunResult } from "../src/run.js";
 
 function metrics(overrides: Partial<RunMetrics> = {}): RunMetrics {
@@ -121,6 +125,71 @@ test("shows a failure stage only when a run reported one", () => {
   assert.equal(row?.cells[0].text, "Inference");
   assert.equal(row?.cells[1].text, "—");
   assert.equal(rowFor(rows, "Status")?.differs, true);
+});
+
+test("does not call different invocations the same configuration", () => {
+  const base = run({ run_id: "a", command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] } });
+  const otherSource = run({
+    run_id: "b",
+    command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/b.png"] },
+  });
+
+  // Same task, model, and execution, but a different source: statistics over
+  // the pair would describe no single thing.
+  assert.equal(sameConfiguration([base, otherSource]), false);
+  assert.equal(
+    describeComparison([base, otherSource]),
+    "2 runs differing in arguments.",
+  );
+
+  const otherThreshold = run({
+    run_id: "c",
+    command: {
+      bin: "/opt/x",
+      args: ["--type=yolo26", "--min_confidence=0.9", "--source=/a.png"],
+    },
+  });
+  assert.equal(sameConfiguration([base, otherThreshold]), false);
+});
+
+test("names a transport that differs, which only the execution carries", () => {
+  const http = run({
+    run_id: "a",
+    execution: {
+      workflow: "client_server",
+      backend: null,
+      protocol: "kserve_v2",
+      transport: "http",
+    },
+  });
+  const grpc = run({
+    run_id: "b",
+    execution: {
+      workflow: "client_server",
+      backend: null,
+      protocol: "kserve_v2",
+      transport: "grpc",
+    },
+  });
+
+  // Both are client-server against the same protocol, so a caption looking
+  // only at the workflow would call these identical while the Execution row
+  // says otherwise.
+  assert.equal(
+    describeComparison([http, grpc]),
+    "2 runs differing in execution.",
+  );
+  assert.equal(rowFor(compareRuns([http, grpc]), "Execution")?.differs, true);
+});
+
+test("names a task that differs", () => {
+  assert.equal(
+    describeComparison([
+      run({ run_id: "a" }),
+      run({ run_id: "b", task: "classification" }),
+    ]),
+    "2 runs differing in task.",
+  );
 });
 
 test("names what varies without interpreting it", () => {

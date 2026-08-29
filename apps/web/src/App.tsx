@@ -131,7 +131,9 @@ function Configurator({
   // is displayed: comparing two should not stop you looking at a third.
   const [comparedIds, setComparedIds] = useState<string[]>([]);
   const [repeat, setRepeat] = useState(1);
-  // Which run of how many, while a repetition is in flight.
+  // Set for the whole batch, not just between requests: each finished run
+  // leaves the live state "done" while later ones are still to come, so this
+  // is what knows a batch is still in flight.
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(
     null,
   );
@@ -169,9 +171,15 @@ function Configurator({
 
   // A selected history entry replaces what the panel shows. The live state
   // wins whenever nothing is selected, so a launch always displays itself.
+  // A batch holds the controls until every run in it has finished, because a
+  // finished run leaves the live state "done" while later ones are pending.
+  const busy = run.status === "running" || progress !== null;
+
   const selected = entryFor(history, selectedId);
+  // A live error outranks a selection: a rejection that stopped a batch has to
+  // be visible, not hidden behind the last run that did succeed.
   const shown: RunState =
-    selected && run.status !== "running"
+    selected && run.status !== "running" && run.status !== "error"
       ? { status: "done", run: selected.run }
       : run;
 
@@ -201,7 +209,7 @@ function Configurator({
     const total = Math.max(1, Math.min(repeat, MAX_REPEAT));
     setRun({ status: "running" });
     setSelectedId(null);
-    setProgress(total > 1 ? { done: 0, total } : null);
+    setProgress({ done: 0, total });
 
     const launched: string[] = [];
     for (let index = 0; index < total; index += 1) {
@@ -213,7 +221,7 @@ function Configurator({
         setHistory((entries) => remember(entries, result));
         setSelectedId(result.run_id);
         launched.push(result.run_id);
-        setProgress(total > 1 ? { done: index + 1, total } : null);
+        setProgress({ done: index + 1, total });
       } catch (error: unknown) {
         const failure =
           error instanceof RunFailedError
@@ -227,6 +235,9 @@ function Configurator({
           code: failure.code,
           message: failure.message,
         });
+        // A batch that stopped early must say so. Leaving an earlier run
+        // selected would keep showing a success the batch no longer had.
+        setSelectedId(null);
         break;
       }
     }
@@ -363,12 +374,12 @@ function Configurator({
           <button
             data-testid="run"
             type="button"
-            disabled={missing.length > 0 || run.status === "running"}
+            disabled={missing.length > 0 || busy}
             onClick={() => void launch()}
           >
-            {run.status === "running"
-              ? progress
-                ? `Running ${progress.done + 1} of ${progress.total}…`
+            {busy
+              ? progress && progress.total > 1
+                ? `Running ${Math.min(progress.done + 1, progress.total)} of ${progress.total}…`
                 : "Running…"
               : repeat > 1
                 ? `Run ${repeat} times`
@@ -382,7 +393,7 @@ function Configurator({
               min={1}
               max={MAX_REPEAT}
               value={repeat}
-              disabled={run.status === "running"}
+              disabled={busy}
               onChange={(event) =>
                 setRepeat(
                   Math.max(
