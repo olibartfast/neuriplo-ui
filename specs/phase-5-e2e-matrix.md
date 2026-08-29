@@ -79,6 +79,11 @@ way anything distinguishes the two, and it is deliberately visible in the UI.
 
 ## Slice A — Start the harness and make it deterministic
 
+**Status: implemented.** `e2e/fixtures/producer/` holds the fixture,
+`e2e/fixtures/assets/` its inputs, and `e2e/playwright.config.ts` starts both
+apps. The existing suite passed unchanged against the fixture and against a
+real binary, which is what this slice was aiming at.
+
 The suite must start what it tests and stop needing a machine.
 
 ### A1. Add the fixture producer
@@ -154,6 +159,11 @@ NEURIPLO_INFER_BIN=/path/to/neuriplo-infer npm run test:e2e
 
 ## Slice B — Assert semantics, not terminal states
 
+**Status: implemented** in `e2e/tests/runs.spec.ts`, with the contract-driven
+driver in `e2e/tests/support/harness.ts`. The run test that only checked for a
+terminal state moved out of `pipeline.spec.ts`, which is now the configurator's
+suite alone.
+
 With a deterministic producer, the suite can assert what a run *meant*.
 
 ### B1. Assert a successful run's substance
@@ -188,6 +198,11 @@ Slice B gates: as Slice A, plus the matrix passing against the fixture.
 
 ## Slice C — Execution coverage
 
+**Status: implemented, one half deferred.** Backend switching runs each
+advertised backend and skips with its reason where a build advertises one.
+Client-server execution runs against the fixture's workflow; the deterministic
+remote runtime it would need to prove the server's half is Phase 6's.
+
 - **Local backend switching.** Only meaningful where a build advertises more
   than one backend. The suite selects each advertised backend in turn and
   asserts the run reaches its terminal state; where a build advertises one, the
@@ -199,12 +214,16 @@ Slice B gates: as Slice A, plus the matrix passing against the fixture.
 
 ## Slice D — CI
 
+**Status: implemented** in `.github/workflows/ci.yml`.
+
 Wire the gates into GitHub Actions once they are green locally: install, build,
 unit tests, then Playwright with the fixture producer, uploading the report and
 traces on failure. Phase 7 owns linting, formatting, and packaging; this slice
 only runs what Phase 5 defines.
 
 ## Slice E — Documentation and acceptance
+
+**Status: implemented.**
 
 Update `README.md` and `specs/roadmap.md` after the gates pass.
 
