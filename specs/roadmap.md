@@ -177,6 +177,8 @@ termination are the adapter's own verdicts about a run it stopped.
 
 Goal: turn Neuriplo UI into a regression harness rather than only a manual frontend.
 
+Implementation contract: [Phase 5 — Real E2E matrix](phase-5-e2e-matrix.md).
+
 - [ ] Start web/server automatically from Playwright configuration or CI.
 - [ ] Add deterministic fixture assets.
 - [ ] Test at least one pipeline per major task family.
