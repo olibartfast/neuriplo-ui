@@ -131,6 +131,19 @@ install step at all gives 27 passed, 1 skipped — the same result as the host.
 So the container removes exactly one step, but it is the only step that needs
 privileges, and that is enough to justify a single file.
 
+Two things the image does not give for free, and the file has to say so:
+
+- it defaults to root, and a run as root leaves the bind-mounted workspace full
+  of root-owned files — 8,069 of them from one `npm ci`. It runs as the image's
+  non-root `ubuntu` rather than its `pwuser`, because this is a Noble image
+  where `ubuntu` already holds uid 1000 and `pwuser` holds 1001: remapping
+  pwuser onto a host uid of 1000 collides with an existing user and leaves the
+  workspace unwritable, while `ubuntu` matches as it stands;
+- Docker gives a container 64 MB of `/dev/shm` and Chromium exhausts it.
+  `--ipc=host` is Playwright's own guidance and raises it to the host's, which
+  measured 7.3 GB. A container whose entire purpose is browser reliability
+  cannot leave that to chance.
+
 The honest limit is recorded next to it: this simplifies the *fixture* path
 only. A `neuriplo-infer` built with backends, its weights, and
 `neuriplo-kserve-runtime` are built in other repositories, and nothing here can

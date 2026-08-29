@@ -66,9 +66,12 @@ looks at them.
 
 `.devcontainer/` is optional and exists for one reason: it ships the browsers
 and system libraries the E2E suite needs, so setup is `npm ci` with no
-`playwright install --with-deps` and no root. It does not help with the real
-producer — `neuriplo-infer`, its weights, and `neuriplo-kserve-runtime` are
-built elsewhere and still have to be pointed at.
+`playwright install --with-deps` and no root on the host. It runs as the
+image's non-root `ubuntu` user, so nothing it writes into the workspace comes
+back owned by root, and it raises `/dev/shm` past the 64 MB Docker default that
+Chromium runs out of. It does not help with the real producer —
+`neuriplo-infer`, its weights, and `neuriplo-kserve-runtime` are built
+elsewhere and still have to be pointed at.
 
 The local adapter exposes `GET /api/capabilities`, `POST /api/runs`, and
 `GET /api/runs/:runId/artifacts/*`. It invokes
