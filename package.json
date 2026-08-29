@@ -10,6 +10,8 @@
     "dev": "npm-run-all --parallel dev:web dev:server",
     "dev:web": "npm --workspace @neuriplo-ui/web run dev",
     "dev:server": "npm --workspace @neuriplo-ui/server run dev",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "typecheck": "npm-run-all typecheck:web typecheck:server typecheck:e2e",
     "typecheck:web": "npm --workspace @neuriplo-ui/web run typecheck",
     "typecheck:server": "npm --workspace @neuriplo-ui/server run typecheck",
