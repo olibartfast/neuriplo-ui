@@ -22,6 +22,7 @@ import {
 import { RunFailedError, startRun } from "./run.js";
 import { RunPanel, type RunState } from "./RunView.js";
 import { HistoryPanel } from "./HistoryView.js";
+import { ComparePanel } from "./CompareView.js";
 import { entryFor, remember, type HistoryEntry } from "./history.js";
 import {
   DirectoryListingError,
@@ -118,6 +119,9 @@ function Configurator({
   // Which retained run the panel is showing. Null means the live one, which is
   // what a fresh page, a running run, and a rejected request all are.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which runs are being compared, which is a separate choice from which run
+  // is displayed: comparing two should not stop you looking at a third.
+  const [comparedIds, setComparedIds] = useState<string[]>([]);
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -156,6 +160,20 @@ function Configurator({
     selected && run.status !== "running"
       ? { status: "done", run: selected.run }
       : run;
+
+  // Compared runs keep the order they were run in, oldest first, so the
+  // columns read left to right the way the runs happened.
+  const compared = history
+    .filter((entry) => comparedIds.includes(entry.run.run_id))
+    .map((entry) => entry.run)
+    .reverse();
+
+  const toggleCompare = (runId: string) =>
+    setComparedIds((current) =>
+      current.includes(runId)
+        ? current.filter((id) => id !== runId)
+        : [...current, runId],
+    );
 
   const launch = () => {
     setRun({ status: "running" });
@@ -310,8 +328,12 @@ function Configurator({
       <HistoryPanel
         history={history}
         selectedId={selectedId}
+        comparedIds={comparedIds}
         onSelect={setSelectedId}
+        onToggleCompare={toggleCompare}
       />
+
+      <ComparePanel runs={compared} />
     </>
   );
 }
