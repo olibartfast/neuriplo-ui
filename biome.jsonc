@@ -41,8 +41,8 @@
         // or helper — `PathField` returns the input, `renderControl` returns
         // the input or select — and the rule only inspects the JSX written
         // directly inside the label. The controls really are inside their
-        // labels at runtime, which `apps/web/test/label.test.tsx` asserts
-        // rather than leaving to this comment.
+        // labels at runtime, which `e2e/tests/accessibility.spec.ts` asserts
+        // against the rendered DOM rather than leaving to this comment.
         "noLabelWithoutControl": "off"
       }
     }
