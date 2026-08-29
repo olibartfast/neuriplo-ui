@@ -134,8 +134,7 @@ export async function executeRun(
     });
   });
 
-  const durationMs =
-    Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+  const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
   return {
     runId,

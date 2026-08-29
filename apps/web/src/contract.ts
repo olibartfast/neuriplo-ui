@@ -1,5 +1,5 @@
-// Shape of the neuriplo-infer capabilities contract (schema_version 1), as
-// defined by docs/capabilities.schema.json in neuriplo-infer.
+// Shape of the neuriplo-infer capabilities contract, as defined by
+// docs/capabilities.schema.json in neuriplo-infer.
 //
 // This file describes the *shape* of the contract only. The set of tasks,
 // models, backends, protocols, sources, and parameters stays authoritative in
@@ -69,7 +69,13 @@ export type CapabilitySourceType = {
 };
 
 export type NeuriploCapabilities = {
-  schema_version: 1;
+  /**
+   * Whatever version the adapter accepted and passed through — 1 or 2 today.
+   * Not a literal: the adapter is the authority on which versions are
+   * supported, and pinning one here would make a v2 document unrepresentable
+   * while the UI is already displaying it.
+   */
+  schema_version: number;
   producer: { name: "neuriplo-infer"; version: string };
   execution: { workflows: CapabilityWorkflow[] };
   source_types: CapabilitySourceType[];
@@ -93,7 +99,7 @@ export async function fetchCapabilities(
   let response: Response;
   try {
     response = await fetch("/api/capabilities", { signal });
-  } catch (cause) {
+  } catch {
     throw new CapabilitiesFetchError(
       "unreachable",
       "Could not reach the local Neuriplo adapter.",

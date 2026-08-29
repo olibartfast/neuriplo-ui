@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { NeuriploCapabilities } from "./contract.js";
-import type { RunArtifact, RunResult } from "./run.js";
 import { formatBytes } from "./files.js";
 import {
+  type CopyState,
   copyText,
   describeExecution,
   formatCommand,
@@ -11,8 +11,8 @@ import {
   labelForStage,
   metricRows,
   summarizeOutcome,
-  type CopyState,
 } from "./results.js";
+import type { RunArtifact, RunResult } from "./run.js";
 
 /**
  * The terminal view of a run. Everything shown here comes from the run
@@ -167,7 +167,9 @@ function Metrics({ metrics }: { metrics: RunResult["metrics"] }) {
         {rows.map((row) => (
           <div className="fact" key={row.label}>
             <dt>{row.label}</dt>
-            <dd data-testid={`metric-${row.label.toLowerCase().replace(/ /g, "-")}`}>
+            <dd
+              data-testid={`metric-${row.label.toLowerCase().replace(/ /g, "-")}`}
+            >
               {row.value}
             </dd>
           </div>
@@ -317,6 +319,11 @@ export function Artifacts({ artifacts }: { artifacts: RunArtifact[] }) {
               </a>
             )}
             {artifact.media_type.startsWith("video/") && (
+              // The artifact is a video neuriplo-infer rendered from the
+              // run's own input. No track exists to point at, and an empty one
+              // would assert there is nothing to hear — a claim about the
+              // source that this UI is in no position to make.
+              // biome-ignore lint/a11y/useMediaCaption: a rendered artifact has no caption track to offer
               <video
                 data-testid={`artifact-preview-${artifact.name}`}
                 className="artifact-preview"

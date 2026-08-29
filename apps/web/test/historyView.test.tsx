@@ -1,7 +1,8 @@
 // tsx compiles this file with the classic JSX runtime, so React stays in scope.
-import React from "react";
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { HistoryPanel } from "../src/HistoryView.js";
 import type { HistoryEntry } from "../src/history.js";
@@ -83,10 +84,14 @@ test("lists each run with what it was and how it ended", () => {
 test("marks the selected run as current", () => {
   const markup = render([entry("run-a"), entry("run-b")], "run-b");
 
-  const selected = markup.slice(markup.indexOf('data-testid="history-entry-run-b"'));
+  const selected = markup.slice(
+    markup.indexOf('data-testid="history-entry-run-b"'),
+  );
   assert.match(selected.slice(0, 200), /aria-current="true"/);
 
-  const other = markup.slice(markup.indexOf('data-testid="history-entry-run-a"'));
+  const other = markup.slice(
+    markup.indexOf('data-testid="history-entry-run-a"'),
+  );
   assert.doesNotMatch(other.slice(0, 200), /aria-current="true"/);
 });
 

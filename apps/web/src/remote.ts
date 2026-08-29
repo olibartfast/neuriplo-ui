@@ -92,7 +92,10 @@ export function remoteParameters(
   capabilities: NeuriploCapabilities,
   workflow: CapabilityWorkflow,
 ): RemoteParameters {
-  const ids = [...workflow.parameters.required, ...workflow.parameters.optional];
+  const ids = [
+    ...workflow.parameters.required,
+    ...workflow.parameters.optional,
+  ];
   const typed = (id: string) => capabilities.parameters[id]?.value_type;
 
   const version =

@@ -414,9 +414,7 @@ function resolveProtocol(
   }
 
   const id = requireString(value, "execution.protocol");
-  const protocol = workflow.protocols.find(
-    (candidate) => candidate.id === id,
-  );
+  const protocol = workflow.protocols.find((candidate) => candidate.id === id);
   if (!protocol) {
     throw new RunRequestError(
       "unknown_protocol",

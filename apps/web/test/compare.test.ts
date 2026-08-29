@@ -128,7 +128,10 @@ test("shows a failure stage only when a run reported one", () => {
 });
 
 test("does not call different invocations the same configuration", () => {
-  const base = run({ run_id: "a", command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] } });
+  const base = run({
+    run_id: "a",
+    command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] },
+  });
   const otherSource = run({
     run_id: "b",
     command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/b.png"] },
@@ -204,7 +207,10 @@ test("names what varies without interpreting it", () => {
     },
   });
 
-  assert.equal(describeComparison([local, remote]), "2 runs differing in execution.");
+  assert.equal(
+    describeComparison([local, remote]),
+    "2 runs differing in execution.",
+  );
   assert.equal(
     describeComparison([local, run({ run_id: "c", model: "rtdetr" })]),
     "2 runs differing in model.",

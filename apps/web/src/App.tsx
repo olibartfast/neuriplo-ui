@@ -1,38 +1,38 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { ComparePanel } from "./CompareView.js";
 import {
   CapabilitiesFetchError,
+  type CapabilityParameter,
   fetchCapabilities,
   labelFor,
-  type CapabilityParameter,
   type NeuriploCapabilities,
 } from "./contract.js";
 import {
+  type DirectoryEntry,
+  type DirectoryListing,
+  DirectoryListingError,
+  formatBytes,
+  listDirectory,
+} from "./files.js";
+import { HistoryPanel } from "./HistoryView.js";
+import { entryFor, type HistoryEntry, remember } from "./history.js";
+import { RemotePanel } from "./RemoteView.js";
+import { RunPanel, type RunState } from "./RunView.js";
+import { remoteParameters } from "./remote.js";
+import { RunFailedError, startRun } from "./run.js";
+import {
+  type ActiveParameter,
   canAddSource,
   canRemoveSource,
   findTaskModelForSelector,
   missingRequirements,
   modelSelectorPatterns,
   modelSelectorSuggestions,
-  resolveSelection,
-  type ActiveParameter,
   type ResolvedSelection,
+  resolveSelection,
   type Selection,
 } from "./selection.js";
-import { RunFailedError, startRun } from "./run.js";
-import { RemotePanel } from "./RemoteView.js";
-import { remoteParameters } from "./remote.js";
-import { RunPanel, type RunState } from "./RunView.js";
-import { HistoryPanel } from "./HistoryView.js";
-import { ComparePanel } from "./CompareView.js";
-import { entryFor, remember, type HistoryEntry } from "./history.js";
-import {
-  DirectoryListingError,
-  formatBytes,
-  listDirectory,
-  type DirectoryEntry,
-  type DirectoryListing,
-} from "./files.js";
 
 /**
  * Ceiling on a repetition. Every run keeps its whole stdout and stderr in the
@@ -97,7 +97,9 @@ function DiscoveryPending() {
   return (
     <section className="panel empty-state" aria-label="Capability discovery">
       <span data-testid="capabilities-status">Discovering capabilities…</span>
-      <p>Asking neuriplo-infer which tasks, models, and backends it supports.</p>
+      <p>
+        Asking neuriplo-infer which tasks, models, and backends it supports.
+      </p>
     </section>
   );
 }
@@ -134,9 +136,10 @@ function Configurator({
   // Set for the whole batch, not just between requests: each finished run
   // leaves the live state "done" while later ones are still to come, so this
   // is what knows a batch is still in flight.
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(
-    null,
-  );
+  const [progress, setProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
 
   const resolved = useMemo(
     () => resolveSelection(capabilities, desired),
@@ -447,7 +450,13 @@ function SourcePaths({
     <div className="parameters">
       <div className="grid">
         {selection.sources.map((source, index) => (
-          <label key={index}>
+          <label
+            // These are positional slots rather than a list of things: the
+            // contract's min_items/max_items decide how many inputs a task
+            // gets, nothing reorders them, and there is no other id to key on.
+            // biome-ignore lint/suspicious/noArrayIndexKey: the slot's identity is its position
+            key={index}
+          >
             <span>
               {labelFor(selection.sourceType)}
               {selection.sources.length > 1 ? ` ${index + 1}` : ""}
@@ -539,7 +548,9 @@ function ModelChoice({
         list={listId}
         value={draft}
         aria-invalid={invalid}
-        aria-describedby={patterns.length > 0 ? `${listId}-patterns` : undefined}
+        aria-describedby={
+          patterns.length > 0 ? `${listId}-patterns` : undefined
+        }
         onChange={(event) => {
           setDraft(event.target.value);
           setInvalid(false);
@@ -835,6 +846,11 @@ function FileBrowser({
   };
 
   return (
+    // The backdrop is a pointer-only shortcut for closing the dialog.
+    // Keyboard users have the Escape handler on the dialog below, so giving
+    // this element a role and key handler of its own would add a tab stop that
+    // announces nothing.
+    // biome-ignore lint/a11y/noStaticElementInteractions: pointer-only shortcut, Escape covers the keyboard
     <div
       className="browser-backdrop"
       role="presentation"
@@ -854,7 +870,7 @@ function FileBrowser({
       >
         <h2>{title}</h2>
         <p className="browser-path" data-testid="file-browser-path">
-          {state.status === "ready" ? state.listing.path : directory ?? "…"}
+          {state.status === "ready" ? state.listing.path : (directory ?? "…")}
         </p>
 
         <div className="browser-list">

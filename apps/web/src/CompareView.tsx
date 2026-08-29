@@ -1,7 +1,7 @@
-import type { RunResult } from "./run.js";
 import { compareRuns, describeComparison } from "./compare.js";
-import { summarize } from "./summary.js";
 import { labelFor } from "./contract.js";
+import type { RunResult } from "./run.js";
+import { summarize } from "./summary.js";
 
 /**
  * Two or more runs side by side.
@@ -93,7 +93,8 @@ function SummaryTable({ runs }: { runs: readonly RunResult[] }) {
   return (
     <>
       <h3>
-        Across {summary.runs} runs <span className="flag">of one configuration</span>
+        Across {summary.runs} runs{" "}
+        <span className="flag">of one configuration</span>
       </h3>
       <div className="comparison-scroll">
         <table className="comparison" data-testid="summary">

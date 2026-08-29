@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { summarize } from "../src/summary.js";
 import type { RunMetrics, RunResult } from "../src/run.js";
+import { summarize } from "../src/summary.js";
 
 function metrics(overrides: Partial<RunMetrics> = {}): RunMetrics {
   return {
@@ -104,7 +104,10 @@ test("refuses to aggregate across different configurations", () => {
     null,
   );
   assert.equal(
-    summarize([run({ run_id: "a" }), run({ run_id: "b", task: "classification" })]),
+    summarize([
+      run({ run_id: "a" }),
+      run({ run_id: "b", task: "classification" }),
+    ]),
     null,
   );
 });

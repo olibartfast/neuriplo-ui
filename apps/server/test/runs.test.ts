@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NeuriploCapabilities } from "../src/capabilities.js";
-import { RunRequestError, planRun } from "../src/runs.js";
+import { planRun, RunRequestError } from "../src/runs.js";
 
 const fixture: NeuriploCapabilities = {
   schema_version: 1,
@@ -121,7 +121,10 @@ test("builds a deterministic argument array", () => {
 });
 
 test("passes the requested selector through so the binary resolves it", () => {
-  assert.equal(plan({ ...localRun, model: "yolo-custom" }).args[0], "--type=yolo-custom");
+  assert.equal(
+    plan({ ...localRun, model: "yolo-custom" }).args[0],
+    "--type=yolo-custom",
+  );
 });
 
 test("drops untouched optional parameters", () => {
