@@ -221,7 +221,9 @@ advertising a single backend, which is what every current build does.
 
 ## Phase 6 — Remote inference and benchmark workflows
 
-- [ ] Expose client-server endpoint/model/version/transport configuration.
+Implementation contract: [Phase 6 — Remote inference and benchmark workflows](phase-6-remote-benchmark.md).
+
+- [x] Expose client-server endpoint/model/version/transport configuration.
 - [ ] Show remote server metadata and advertised platform.
 - [ ] Compare local and remote inference runs.
 - [ ] Add repeated benchmark runs and summary statistics.
