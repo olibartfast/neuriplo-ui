@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-  FileBrowseError,
   browseRoot,
+  FileBrowseError,
   initialDirectory,
   listDirectory,
 } from "../src/files.js";

@@ -1,7 +1,7 @@
+import { labelFor } from "./contract.js";
 import type { HistoryEntry } from "./history.js";
 import { formatAge } from "./history.js";
 import { describeExecution, formatDuration } from "./results.js";
-import { labelFor } from "./contract.js";
 
 /**
  * The runs this session has completed, newest first.

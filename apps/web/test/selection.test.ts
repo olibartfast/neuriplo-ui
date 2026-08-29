@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { NeuriploCapabilities } from "../src/contract.js";
+import { buildRunRequest } from "../src/run.js";
 import {
   canAddSource,
   canRemoveSource,
@@ -12,7 +13,6 @@ import {
   modelSelectorSuggestions,
   resolveSelection,
 } from "../src/selection.js";
-import { buildRunRequest } from "../src/run.js";
 
 const capabilities: NeuriploCapabilities = {
   schema_version: 1,
@@ -231,7 +231,10 @@ test("reports the source and required parameters that are still empty", () => {
   const resolved = resolveSelection(capabilities, {
     workflowId: "client_server",
   });
-  assert.deepEqual(missingRequirements(resolved), ["source", "kserve_endpoint"]);
+  assert.deepEqual(missingRequirements(resolved), [
+    "source",
+    "kserve_endpoint",
+  ]);
 
   const filled = resolveSelection(capabilities, {
     ...resolved.selection,
@@ -314,7 +317,10 @@ test("keeps the minimum number of slots for a multi-source task", () => {
   });
   assert.deepEqual(filledSources(complete), ["/a.png", "/b.png", "/c.png"]);
   assert.deepEqual(missingRequirements(complete), []);
-  assert.equal(canRemoveSource(complete.task, complete.selection.sources), true);
+  assert.equal(
+    canRemoveSource(complete.task, complete.selection.sources),
+    true,
+  );
 });
 
 test("binds the transport control to the parameter that carries it", () => {

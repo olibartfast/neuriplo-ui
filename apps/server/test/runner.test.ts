@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
-  RunExecutionError,
   executeRun,
+  RunExecutionError,
   resolveArtifactPath,
 } from "../src/runner.js";
 
@@ -16,11 +16,7 @@ import {
  */
 async function fakeBinary(directory: string, body: string): Promise<string> {
   const path = join(directory, "fake-infer.mjs");
-  await writeFile(
-    path,
-    `#!/usr/bin/env node\n${body}\n`,
-    { mode: 0o755 },
-  );
+  await writeFile(path, `#!/usr/bin/env node\n${body}\n`, { mode: 0o755 });
   return path;
 }
 

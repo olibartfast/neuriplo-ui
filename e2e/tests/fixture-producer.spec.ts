@@ -57,17 +57,21 @@ test.describe("fixture producer", () => {
 
     const workflows = capabilities.execution.workflows;
     const local = workflows.find((workflow) => workflow.id === "local");
-    const remote = workflows.find((workflow) => workflow.id === "client_server");
+    const remote = workflows.find(
+      (workflow) => workflow.id === "client_server",
+    );
 
     expect(local?.backends.length).toBeGreaterThan(1);
     expect(remote?.protocols.length).toBeGreaterThan(0);
     expect(remote?.parameters.required.length).toBeGreaterThan(0);
 
     const tasks = capabilities.tasks;
-    expect(tasks.some((task) => task.models.some((m) => m.aliases.length > 0)))
-      .toBe(true);
-    expect(tasks.some((task) => task.models.some((m) => m.patterns.length > 0)))
-      .toBe(true);
+    expect(
+      tasks.some((task) => task.models.some((m) => m.aliases.length > 0)),
+    ).toBe(true);
+    expect(
+      tasks.some((task) => task.models.some((m) => m.patterns.length > 0)),
+    ).toBe(true);
     expect(tasks.some((task) => task.sources.min_items > 1)).toBe(true);
     expect(tasks.some((task) => task.sources.max_items < 0)).toBe(true);
     expect(tasks.some((task) => task.sources.types.includes("video"))).toBe(

@@ -114,7 +114,8 @@ export async function copyText(
   if (!clipboard || typeof clipboard.writeText !== "function") {
     return {
       status: "failed",
-      message: "Clipboard access is unavailable; select the command to copy it.",
+      message:
+        "Clipboard access is unavailable; select the command to copy it.",
     };
   }
   try {

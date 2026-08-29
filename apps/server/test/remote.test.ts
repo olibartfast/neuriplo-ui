@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  RemoteMetadataError,
   allowedHosts,
   assertEndpointAllowed,
   fetchRemoteMetadata,
+  RemoteMetadataError,
 } from "../src/remote.js";
 
 const SERVER = {
@@ -41,7 +41,11 @@ function respondWith(
 }
 
 test("defaults to loopback and takes an explicit allowlist", () => {
-  assert.deepEqual(allowedHosts({ allow: "" }), ["127.0.0.1", "::1", "localhost"]);
+  assert.deepEqual(allowedHosts({ allow: "" }), [
+    "127.0.0.1",
+    "::1",
+    "localhost",
+  ]);
   assert.deepEqual(allowedHosts({ allow: "gpu-box, 10.0.0.5:8000" }), [
     "gpu-box",
     "10.0.0.5:8000",
@@ -60,7 +64,10 @@ test("refuses a host nobody allowed", () => {
   // The adapter can reach hosts the browser cannot, so an endpoint outside the
   // allowlist is refused before anything connects.
   assert.throws(
-    () => assertEndpointAllowed("http://169.254.169.254/latest/meta-data", { allow: "" }),
+    () =>
+      assertEndpointAllowed("http://169.254.169.254/latest/meta-data", {
+        allow: "",
+      }),
     (error: unknown) => {
       assert.ok(error instanceof RemoteMetadataError);
       assert.equal(error.code, "forbidden_endpoint");
@@ -81,7 +88,8 @@ test("matches an allowlist entry by host, and by host and port together", () => 
   );
   // A pinned port does not permit a different one.
   assert.throws(
-    () => assertEndpointAllowed("http://gpu-box:9000", { allow: "gpu-box:8000" }),
+    () =>
+      assertEndpointAllowed("http://gpu-box:9000", { allow: "gpu-box:8000" }),
     /not permitted/,
   );
 });
@@ -103,20 +111,26 @@ test("refuses anything that is not an http(s) URL", () => {
 
 test("refuses credentials in the endpoint", () => {
   assert.throws(
-    () => assertEndpointAllowed("http://user:secret@127.0.0.1:8000", { allow: "" }),
+    () =>
+      assertEndpointAllowed("http://user:secret@127.0.0.1:8000", { allow: "" }),
     /must not carry credentials/,
   );
 });
 
 test("reads server and model metadata", async () => {
   const seen: string[] = [];
-  const metadata = await fetchRemoteMetadata("http://127.0.0.1:8000", "yolo26", null, {
-    allow: "",
-    fetchImpl: respondWith(
-      { "/v2": SERVER, "/v2/models/yolo26": MODEL },
-      seen,
-    ),
-  });
+  const metadata = await fetchRemoteMetadata(
+    "http://127.0.0.1:8000",
+    "yolo26",
+    null,
+    {
+      allow: "",
+      fetchImpl: respondWith(
+        { "/v2": SERVER, "/v2/models/yolo26": MODEL },
+        seen,
+      ),
+    },
+  );
 
   assert.equal(metadata.server.name, "neuriplo-kserve-runtime");
   assert.deepEqual(metadata.server.extensions, ["model_repository"]);
@@ -143,10 +157,15 @@ test("asks for a pinned version when one is configured", async () => {
 });
 
 test("describes the server even when it does not know the model", async () => {
-  const metadata = await fetchRemoteMetadata("http://127.0.0.1:8000", "absent", null, {
-    allow: "",
-    fetchImpl: respondWith({ "/v2": SERVER }),
-  });
+  const metadata = await fetchRemoteMetadata(
+    "http://127.0.0.1:8000",
+    "absent",
+    null,
+    {
+      allow: "",
+      fetchImpl: respondWith({ "/v2": SERVER }),
+    },
+  );
 
   // A model the server does not publish is not an error about the server, and
   // the run stays the authority on whether the configuration works.
@@ -156,10 +175,15 @@ test("describes the server even when it does not know the model", async () => {
 
 test("skips the model lookup when no model is named", async () => {
   const seen: string[] = [];
-  const metadata = await fetchRemoteMetadata("http://127.0.0.1:8000", null, null, {
-    allow: "",
-    fetchImpl: respondWith({ "/v2": SERVER }, seen),
-  });
+  const metadata = await fetchRemoteMetadata(
+    "http://127.0.0.1:8000",
+    null,
+    null,
+    {
+      allow: "",
+      fetchImpl: respondWith({ "/v2": SERVER }, seen),
+    },
+  );
 
   assert.deepEqual(seen, ["/v2"]);
   assert.equal(metadata.model, null);
@@ -183,7 +207,9 @@ test("rejects a body that is not JSON", async () => {
     fetchRemoteMetadata("http://127.0.0.1:8000", null, null, {
       allow: "",
       fetchImpl: (async () =>
-        new Response("<html>hello</html>", { status: 200 })) as unknown as typeof fetch,
+        new Response("<html>hello</html>", {
+          status: 200,
+        })) as unknown as typeof fetch,
     }),
     (error: unknown) =>
       error instanceof RemoteMetadataError && error.code === "invalid_response",

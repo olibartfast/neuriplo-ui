@@ -120,7 +120,10 @@ export function resolveSelection(
   const model = matched?.task.id === task.id ? matched.model : undefined;
   const selectedModel = model ?? task.models[0];
   const modelId = model && requestedModel ? requestedModel : selectedModel.id;
-  const workflow = pickById(capabilities.execution.workflows, desired.workflowId);
+  const workflow = pickById(
+    capabilities.execution.workflows,
+    desired.workflowId,
+  );
 
   const backend = pickValue(workflow.backends, desired.backend);
   const protocol =

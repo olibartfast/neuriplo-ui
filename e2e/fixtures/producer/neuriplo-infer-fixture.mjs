@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * A deterministic stand-in for `neuriplo-infer`.
  *
@@ -19,8 +20,8 @@
  * stage. Everything else succeeds.
  */
 
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { CAPABILITIES, RUN_REPORT, resolveSelector } from "./contract.mjs";
 

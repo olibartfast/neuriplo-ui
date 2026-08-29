@@ -11,8 +11,11 @@
     "includes": ["**", "!**/dist", "!**/playwright-report", "!**/test-results"]
   },
 
-  // Matches the style already written throughout, so adopting the formatter
-  // restyles nothing.
+  // Two spaces at 80 columns is the style the TypeScript was already written
+  // in, so adopting the formatter left it alone. The stylesheet is the one
+  // exception: its short rules were written on single lines and are now
+  // expanded, which is the cost of not exempting the one file whose style
+  // disagreed with the tool.
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

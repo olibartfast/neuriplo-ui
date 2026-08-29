@@ -1,7 +1,8 @@
 // tsx compiles this file with the classic JSX runtime, so React stays in scope.
-import React from "react";
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ComparePanel } from "../src/CompareView.js";
 import type { RunResult } from "../src/run.js";
@@ -71,7 +72,9 @@ test("puts the runs side by side and marks the rows that differ", () => {
   );
   assert.match(wallTime.slice(0, 400), /data-differs="true"/);
 
-  const model = markup.slice(markup.indexOf('data-testid="comparison-row-model"'));
+  const model = markup.slice(
+    markup.indexOf('data-testid="comparison-row-model"'),
+  );
   assert.match(model.slice(0, 400), /data-differs="false"/);
 });
 
@@ -111,7 +114,10 @@ test("draws no conclusion from the numbers it shows", () => {
     <ComparePanel
       runs={[
         run({ run_id: "aaaaaaaa-0000-4000-8000-000000000001" }),
-        run({ run_id: "bbbbbbbb-0000-4000-8000-000000000002", duration_ms: 9000 }),
+        run({
+          run_id: "bbbbbbbb-0000-4000-8000-000000000002",
+          duration_ms: 9000,
+        }),
       ]}
     />,
   );
