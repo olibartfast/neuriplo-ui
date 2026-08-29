@@ -209,6 +209,66 @@ test("never retains a request the adapter refused", async ({ page }) => {
   );
 });
 
+test("compares two runs and marks what differed", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const local = capabilities.execution.workflows.find((w) => w.id === "local");
+  const remote = capabilities.execution.workflows.find(
+    (w) => w.id === "client_server",
+  );
+  test.skip(
+    local === undefined || remote === undefined,
+    "the build advertises a single execution workflow",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+
+  // Local against remote is the motivating comparison, and needs no special
+  // support: they are two runs with different executions.
+  await configureRun(page, capabilities, { task, workflow: "local" });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const first = (await page.getByTestId("run-id").textContent())!;
+
+  await page.goto("/");
+  await expect(page.getByTestId("task")).toBeVisible();
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+  await expectRunOutcome(page, capabilities, await launchRun(page), {
+    remote: true,
+  });
+  const second = (await page.getByTestId("run-id").textContent())!;
+
+  // A reload clears the page's history, so only the second run survives; run
+  // the first again to have two in the same session.
+  await configureRun(page, capabilities, { task, workflow: "local" });
+  await expectRunOutcome(page, capabilities, await launchRun(page));
+  const third = (await page.getByTestId("run-id").textContent())!;
+  expect(third).not.toBe(second);
+  expect(third).not.toBe(first);
+
+  await expect(page.getByTestId("comparison")).toHaveCount(0);
+  await page.getByTestId(`compare-${second}`).check();
+  // One run is not a comparison.
+  await expect(page.getByTestId("comparison")).toHaveCount(0);
+
+  await page.getByTestId(`compare-${third}`).check();
+  const comparison = page.getByTestId("comparison");
+  await expect(comparison).toBeVisible();
+  await expect(page.getByTestId("comparison-caption")).toContainText(
+    "differing in execution",
+  );
+
+  // Execution differed by construction; the task did not.
+  await expect(
+    page.getByTestId("comparison-row-execution"),
+  ).toHaveAttribute("data-differs", "true");
+  await expect(page.getByTestId("comparison-row-task")).toHaveAttribute(
+    "data-differs",
+    "false",
+  );
+
+  // Nothing in the table concludes anything from the numbers.
+  await expect(comparison).not.toContainText(/faster|slower|speedup/i);
+});
+
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
 
 for (const family of FAMILIES) {

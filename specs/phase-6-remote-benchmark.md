@@ -142,6 +142,11 @@ benchmark of the producer's own loop.
 
 ## Slice D — Comparison
 
+**Status: implemented.** `apps/web/src/compare.ts` holds the difference rules
+and `apps/web/src/CompareView.tsx` the table, with unit tests in
+`apps/web/test/compare.test.ts` and `compareView.test.tsx` and a browser path
+that compares a local run against a client-server one.
+
 ### D1. Compare retained runs
 
 Select two or more runs from the history and show them side by side: status,

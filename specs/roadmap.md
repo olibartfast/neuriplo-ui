@@ -225,9 +225,9 @@ Implementation contract: [Phase 6 — Remote inference and benchmark workflows](
 
 - [x] Expose client-server endpoint/model/version/transport configuration.
 - [ ] Show remote server metadata and advertised platform.
-- [ ] Compare local and remote inference runs.
+- [x] Compare local and remote inference runs.
 - [ ] Add repeated benchmark runs and summary statistics.
-- [ ] Add a compact backend/model comparison view.
+- [x] Add a compact backend/model comparison view.
 
 ## Phase 7 — Packaging and CI integration
 

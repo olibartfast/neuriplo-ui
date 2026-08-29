@@ -44,12 +44,18 @@ function entry(
   };
 }
 
-function render(history: HistoryEntry[], selectedId: string | null = null) {
+function render(
+  history: HistoryEntry[],
+  selectedId: string | null = null,
+  comparedIds: string[] = [],
+) {
   return renderToStaticMarkup(
     <HistoryPanel
       history={history}
       selectedId={selectedId}
+      comparedIds={comparedIds}
       onSelect={() => {}}
+      onToggleCompare={() => {}}
       now={NOW}
     />,
   );
@@ -93,4 +99,16 @@ test("distinguishes a failed run by text rather than by colour alone", () => {
 
 test("says where history lives, because a reload loses it", () => {
   assert.match(render([entry("run-a")]), /Kept in this page only/);
+});
+
+test("offers a compare control that is separate from the selection", () => {
+  const markup = render([entry("run-a"), entry("run-b")], "run-a", ["run-b"]);
+
+  // Comparing one run and displaying another are different choices, so the
+  // ticked box and the current row need not be the same row.
+  const ticked = markup.slice(markup.indexOf('data-testid="compare-run-b"'));
+  assert.match(ticked.slice(0, 120), /checked=""/);
+
+  const unticked = markup.slice(markup.indexOf('data-testid="compare-run-a"'));
+  assert.doesNotMatch(unticked.slice(0, 120), /checked=""/);
 });
