@@ -90,6 +90,22 @@ retained — and a browser test that runs twice and returns to the first.
 
 ## Slice B — Remote server metadata
 
+**Status: implemented.** `apps/server/src/remote.ts` holds the lookup and its
+confinement, `apps/web/src/RemoteView.tsx` the panel, with unit tests on both
+sides and two browser paths — one describing the fixture KServe responder, one
+asserting the refusal.
+
+One deviation: a redirect is not followed at all, rather than followed only to
+an allowed host. A metadata endpoint has no reason to redirect, and refusing is
+a smaller surface than re-validating wherever it points.
+
+The endpoint parameter is found by its advertised `url` type and needs no
+guessing. The model and version parameters do: nothing in the contract marks
+which parameter names the remote model, so they are matched by id, and that is
+the same gap Phase 3 recorded for pairing a protocol's transports with its
+parameter. A build whose ids do not match gets server metadata without model
+metadata rather than a hardcoded assumption.
+
 ### B1. Ask the server what it is
 
 Add `GET /api/remote/metadata` to the adapter, taking the endpoint the user
@@ -171,6 +187,12 @@ executions differ in ways the numbers alone do not explain, and asserting
 otherwise would be the same mistake as calling wall time inference latency.
 
 ## Slice E — Tests and the deterministic remote
+
+**Status: partly implemented.** `e2e/fixtures/remote/kserve-fixture.mjs` answers
+the KServe V2 metadata paths and the harness starts it, so the metadata path is
+exercised without a network. Pointing the suite at a built
+`neuriplo-kserve-runtime` — which would close the Phase 5 item still waiting on
+it — is the remaining work, and needs that runtime built.
 
 Extend the fixture producer so a client-server run is distinguishable from a
 local one, and add a fixture remote — a small KServe V2 responder — so the

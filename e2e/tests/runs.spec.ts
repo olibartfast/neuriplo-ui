@@ -8,6 +8,7 @@ import {
   expectRunOutcome,
   isFixtureProducer,
   launchRun,
+  setParameter,
   taskForFamily,
   type Family,
 } from "./support/harness.js";
@@ -304,6 +305,98 @@ test("repeats a configuration and summarizes what the runs measured", async ({
   // the iterations of a benchmark loop nobody published per-iteration data for.
   await expect(page.getByText(/not over the iterations of/)).toBeVisible();
   await expect(summary).not.toContainText(/p9[059]|percentile/i);
+});
+
+test("describes the remote server the endpoint addresses", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  test.skip(
+    remote === undefined,
+    "the build advertises no client-server workflow",
+  );
+
+  const endpoint = remote!.parameters.required.find(
+    (id) => capabilities.parameters[id]?.value_type === "url",
+  );
+  test.skip(
+    endpoint === undefined,
+    "the contract advertises no endpoint parameter",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+
+  // The server describes itself whatever else is configured.
+  const metadata = page.getByTestId("remote-metadata");
+  await expect(metadata).toBeVisible({ timeout: 15_000 });
+  await expect(metadata).toContainText("neuriplo-kserve-runtime-fixture");
+
+  // Model metadata needs a model to ask about, found the way the UI finds it:
+  // a string parameter whose id names a model rather than a version.
+  const modelParameter = [
+    ...remote!.parameters.required,
+    ...remote!.parameters.optional,
+  ].find(
+    (id) =>
+      capabilities.parameters[id]?.value_type === "string" &&
+      /model/i.test(id) &&
+      !/version/i.test(id),
+  );
+  test.skip(
+    modelParameter === undefined,
+    "the contract advertises no remote model parameter",
+  );
+
+  await setParameter(page, modelParameter!, task.models[0].id);
+
+  // Whether the server knows this model depends on what it serves, and both
+  // answers are legitimate — the panel has to state which one it got.
+  const described = page.getByTestId("remote-platform");
+  const unknown = page.getByTestId("remote-model-unknown");
+  await expect(described.or(unknown).first()).toBeVisible({ timeout: 15_000 });
+
+  if (await described.count()) {
+    await expect(described).not.toBeEmpty();
+    await expect(page.getByTestId("remote-inputs")).toContainText("FP32");
+  } else {
+    // A model the server does not publish is not an error about the server.
+    await expect(unknown).toContainText("did not describe this model");
+    await expect(metadata).toBeVisible();
+  }
+
+  // The description never gates the run, either way.
+  await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("refuses an endpoint outside the adapter's allowlist", async ({ page }) => {
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  const endpoint = remote?.parameters.required.find(
+    (id) => capabilities.parameters[id]?.value_type === "url",
+  );
+  test.skip(
+    endpoint === undefined,
+    "the contract advertises no endpoint parameter",
+  );
+
+  const task = taskForFamily(capabilities, "image")!;
+  await configureRun(page, capabilities, { task, workflow: "client_server" });
+
+  // The adapter can reach hosts the browser cannot, so an endpoint it was not
+  // configured to allow is refused before anything connects.
+  await setParameter(page, endpoint!, "http://169.254.169.254/latest/meta-data");
+  await expect(page.getByTestId("remote-error")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId("remote-error")).toContainText("not permitted");
+  await expect(page.getByTestId("remote-metadata")).toHaveCount(0);
+
+  // A refusal describes nothing about the server and blocks nothing.
+  await expect(page.getByTestId("run")).toBeEnabled();
 });
 
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];

@@ -13,6 +13,11 @@ import {
   type BrowseOptions,
   type DirectoryListing,
 } from "./files.js";
+import {
+  RemoteMetadataError,
+  fetchRemoteMetadata,
+  type RemoteOptions,
+} from "./remote.js";
 import { buildRunResponse } from "./runResponse.js";
 import { readRunDiagnostics } from "./runReport.js";
 import {
@@ -30,6 +35,7 @@ export type ServerOptions = {
   runInference?: (args: string[]) => Promise<RunOutcome>;
   runner?: RunnerOptions;
   browse?: BrowseOptions;
+  remote?: RemoteOptions;
   logger?: boolean;
 };
 
@@ -41,6 +47,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const runInference =
     options.runInference ?? ((args: string[]) => executeRun(args, runner));
   const browse = options.browse ?? {};
+  const remote = options.remote ?? {};
 
   app.get("/api/health", async () => ({ status: "ok" }));
 
@@ -122,6 +129,34 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     },
   );
 
+  // The only place the adapter fetches a URL the browser supplied, which is
+  // why the endpoint is checked against an allowlist before anything connects.
+  app.get<{
+    Querystring: { endpoint?: string; model?: string; version?: string };
+  }>("/api/remote/metadata", async (request, reply) => {
+    const endpoint = request.query.endpoint?.trim();
+    if (!endpoint) {
+      return reply
+        .code(400)
+        .send(failure("invalid_endpoint", "An endpoint is required", "endpoint"));
+    }
+
+    try {
+      return await fetchRemoteMetadata(
+        endpoint,
+        request.query.model ?? null,
+        request.query.version ?? null,
+        remote,
+      );
+    } catch (error) {
+      if (!(error instanceof RemoteMetadataError)) throw error;
+      app.log.warn({ err: error }, "Remote metadata lookup failed");
+      return reply
+        .code(REMOTE_STATUS[error.code])
+        .send(failure(error.code, error.message, "endpoint"));
+    }
+  });
+
   // Artifacts are addressed relative to their run directory, and the path is
   // re-resolved against that directory so a traversal attempt resolves outside
   // it and is rejected rather than served.
@@ -151,6 +186,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   return app;
 }
+
+const REMOTE_STATUS: Record<RemoteMetadataError["code"], number> = {
+  forbidden_endpoint: 403,
+  invalid_endpoint: 400,
+  invalid_response: 502,
+  unreachable: 502,
+};
 
 const FILE_BROWSE_STATUS: Record<FileBrowseError["code"], number> = {
   forbidden: 403,

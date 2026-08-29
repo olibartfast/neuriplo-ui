@@ -20,6 +20,8 @@ import {
   type Selection,
 } from "./selection.js";
 import { RunFailedError, startRun } from "./run.js";
+import { RemotePanel } from "./RemoteView.js";
+import { remoteParameters } from "./remote.js";
 import { RunPanel, type RunState } from "./RunView.js";
 import { HistoryPanel } from "./HistoryView.js";
 import { ComparePanel } from "./CompareView.js";
@@ -157,6 +159,7 @@ function Configurator({
     });
 
   const workflows = capabilities.execution.workflows;
+  const remote = remoteParameters(capabilities, workflow);
   const missing = [
     ...(!modelSelectorValid ? ["model"] : []),
     ...missingRequirements(resolved),
@@ -324,6 +327,22 @@ function Configurator({
             parameters={required}
             values={selection.parameters}
             onChange={setParameter}
+          />
+        )}
+
+        {/* Only the client-server workflow addresses a server, and only a
+            contract that advertises a url parameter says where. */}
+        {remote.endpoint !== null && (
+          <RemotePanel
+            endpoint={selection.parameters[remote.endpoint] ?? ""}
+            model={
+              remote.model ? (selection.parameters[remote.model] ?? null) : null
+            }
+            version={
+              remote.version
+                ? (selection.parameters[remote.version] ?? null)
+                : null
+            }
           />
         )}
 
