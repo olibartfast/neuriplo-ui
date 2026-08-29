@@ -69,8 +69,16 @@ export type CapabilityRunReport = {
   stages: string[];
 };
 
+/**
+ * Version 1 has no diagnostics section; version 2 added it. Both are accepted
+ * because the difference is exactly what this adapter already treats as
+ * optional: an older binary publishes no run report and the run response then
+ * carries no metrics.
+ */
+export type CapabilitiesSchemaVersion = 1 | 2;
+
 export type NeuriploCapabilities = {
-  schema_version: 1;
+  schema_version: CapabilitiesSchemaVersion;
   producer: { name: "neuriplo-infer"; version: string };
   diagnostics?: { run_report?: CapabilityRunReport };
   execution: { workflows: CapabilityWorkflow[] };
@@ -165,7 +173,7 @@ function assertCapabilities(
   if (!isRecord(value)) {
     throw invalidResponse("Capabilities response must be an object");
   }
-  if (value.schema_version !== 1) {
+  if (value.schema_version !== 1 && value.schema_version !== 2) {
     throw new CapabilitiesDiscoveryError(
       "unsupported_schema",
       `Unsupported capabilities schema version: ${String(value.schema_version)}`,
