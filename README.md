@@ -133,12 +133,62 @@ npm run build
 npm test
 ```
 
+## End-to-end tests
+
+```bash
+npm run test:e2e
+```
+
+The suite starts what it tests: Playwright builds both apps, starts the
+adapter and a preview of the built frontend, and points `NEURIPLO_INFER_BIN`
+at a fixture producer under `e2e/fixtures/producer/`. That fixture implements
+the capabilities and run-report contracts and nothing else — it loads no model
+and predicts nothing — which is what lets the whole matrix run on a machine
+with no models, no weights, and nothing compiled. Inference itself is tested in
+`neuriplo-infer`; what is tested here is the path from a contract to a rendered
+run.
+
+Every assertion is derived from the advertised contract at runtime, so the same
+command runs against a real binary:
+
+```bash
+NEURIPLO_INFER_BIN=/path/to/neuriplo-infer npm run test:e2e
+```
+
+The two assertions that need a known output — a successful run's artifact,
+result and metrics, and a failure attributed to a named stage — check the
+advertised `producer.version` first and skip when it is not the fixture's.
+
+The committed assets are placeholders, so a real binary fails on them. That is
+still held to something: the run must fail *past configuration*, in the stage
+the producer attributes to the inputs it was given, so a binary that rejects
+every command line the adapter builds cannot keep the suite green. Point the
+suite at inputs a real binary can load and the same tests demand success:
+
+| Variable | Purpose |
+| --- | --- |
+| `NEURIPLO_UI_E2E_IMAGE` | Image source used for every image-sourced family. |
+| `NEURIPLO_UI_E2E_VIDEO` | Video source. |
+| `NEURIPLO_UI_E2E_WEIGHTS` | Weights for every parameter the contract types as a path. |
+| `NEURIPLO_UI_BROWSE_ROOT` | Directory the picker browses and sources are confined to; the assets above must live under it. |
+
+The harness binds both servers to `127.0.0.1` and confines sources to the
+browse root. Both matter: the page proxies to an adapter that spawns binaries
+and turns the files it is given into artifacts the browser can fetch, so an
+unconfined adapter reachable from the network is an arbitrary local-file read.
+
+An operator already running `npm run dev` keeps their own servers and producer;
+set `CI=1` to force fresh ones. A failing test leaves a trace, a screenshot and
+a video under `e2e/test-results/output/`, alongside `adapter.log` and `web.log`
+for the two servers.
+
 ## Specifications
 
 - [Mission](specs/mission.md)
 - [Tech stack](specs/tech-stack.md)
 - [Roadmap](specs/roadmap.md)
 - [Phase 4 results and diagnostics plan](specs/phase-4-results-diagnostics.md)
+- [Phase 5 E2E matrix plan](specs/phase-5-e2e-matrix.md)
 
 ## Status
 
@@ -155,6 +205,15 @@ Slice B added the producer contract it was waiting on: `neuriplo-infer` now
 publishes versioned per-stage metrics and a typed failure stage, and this
 repository consumes them. Nothing is scraped from log text.
 
-Phase 5 is next: starting the web and server processes from the test harness,
-adding deterministic fixtures, and asserting result semantics rather than only
-a terminal state.
+Phase 5 is complete. The harness starts the web and server processes itself,
+supplies its own producer, and asserts what a run meant: a successful run by
+its served artifact, its structured result and its producer metrics, a failed
+one by the stage the producer named, its exit code, and its stderr. One task
+per structural family runs through the browser, along with each advertised
+local backend and the client-server workflow. GitHub Actions runs the same
+gates.
+
+Two limits are deliberate. Without a remote runtime, client-server execution
+proves the UI and adapter halves and not the server's; and pixel-level
+comparison of rendered predictions stays out, because the fixture producer
+renders nothing. Both belong to Phase 6.
