@@ -189,6 +189,7 @@ for the two servers.
 - [Roadmap](specs/roadmap.md)
 - [Phase 4 results and diagnostics plan](specs/phase-4-results-diagnostics.md)
 - [Phase 5 E2E matrix plan](specs/phase-5-e2e-matrix.md)
+- [Phase 6 remote and benchmark plan](specs/phase-6-remote-benchmark.md)
 
 ## Status
 
