@@ -124,6 +124,7 @@ advanced-parameter form are validated on both sides against the same contract.
 | `NEURIPLO_UI_RUN_TIMEOUT_MS` | Kills a run that outlives it. Defaults to 300000. |
 | `NEURIPLO_UI_SOURCE_ROOT` | When set, source paths outside this directory are refused. |
 | `NEURIPLO_UI_BROWSE_ROOT` | When set, confines the file picker to this directory. Browsing otherwise starts at the adapter user's home directory. |
+| `NEURIPLO_UI_REMOTE_ALLOW` | Hosts a client-server endpoint may address, as `host` or `host:port`, comma separated. Defaults to loopback only. |
 | `HOST`, `PORT` | Adapter bind address. Defaults to `127.0.0.1:5174`. |
 
 Run the build and tests with:
@@ -132,6 +133,46 @@ Run the build and tests with:
 npm run build
 npm test
 ```
+
+## Runs, comparison, and remote servers
+
+A finished run is retained in the page, newest first, and any of them can be
+shown again. History changes which run is displayed and never what a run means,
+so the report itself is unchanged. It lives in the browser only: a reload starts
+empty, and a retained run whose artifacts the adapter has since cleaned still
+shows its command, metrics, and logs.
+
+Ticking two or more runs compares them column by column and marks what differed.
+Local against remote needs no special support — they are two runs with different
+executions — and backend against backend and model against model fall out of the
+same view. The comparison stops at showing the measurements side by side: it
+computes no speedup, names no winner, and normalizes nothing across machines.
+
+`Repeat` launches the same configuration N times, one after another so the runs
+do not contend for the same device, and summarizes count, minimum, median, and
+maximum of everything those runs measured. That is a summary over whole runs,
+not over the iterations of a producer benchmark: `--capabilities` advertises
+`benchmark` and `iterations`, but the run report publishes a single observation
+with nothing per-iteration in it, so a percentile over a producer's own loop
+would have to be invented and is not shown. Aggregation is refused across
+different tasks, models, or executions, because a minimum over two different
+models describes nothing.
+
+For a client-server workflow the adapter asks the endpoint what it is —
+KServe V2 `/v2` and `/v2/models/...` — and the UI shows the server, its version
+and extensions, and the model's platform, versions, and declared tensors. It is
+displayed and never used to narrow a selection: the capabilities contract does
+that. A server that cannot be described blocks nothing, because the run remains
+the authority on whether the configuration works.
+
+This is the only place the adapter fetches a URL the browser supplied, which
+makes it a request-forgery surface: the adapter can reach hosts the browser
+cannot. So the endpoint is confined the way source paths are —
+`NEURIPLO_UI_REMOTE_ALLOW` names the hosts it may address and defaults to
+loopback, an endpoint outside it is refused before anything connects, redirects
+are never followed, and the response is read under a byte budget and a timeout.
+Host allowlisting does not survive a hostname resolving somewhere unintended:
+the guarantee is "only hosts you named", not "whatever DNS says about them".
 
 ## End-to-end tests
 
@@ -170,6 +211,7 @@ suite at inputs a real binary can load and the same tests demand success:
 | `NEURIPLO_UI_E2E_IMAGE` | Image source used for every image-sourced family. |
 | `NEURIPLO_UI_E2E_VIDEO` | Video source. |
 | `NEURIPLO_UI_E2E_WEIGHTS` | Weights for every parameter the contract types as a path. |
+| `NEURIPLO_UI_E2E_ENDPOINT` | Client-server endpoint. Defaults to the fixture KServe responder the harness starts. |
 | `NEURIPLO_UI_BROWSE_ROOT` | Directory the picker browses and sources are confined to; the assets above must live under it. |
 
 The harness binds both servers to `127.0.0.1` and confines sources to the
@@ -205,6 +247,11 @@ with a rejected request visibly distinct from a pipeline that ran and failed.
 Slice B added the producer contract it was waiting on: `neuriplo-infer` now
 publishes versioned per-stage metrics and a typed failure stage, and this
 repository consumes them. Nothing is scraped from log text.
+
+Phase 6 is in progress: run history, comparison, N-run summaries, and remote
+server metadata are implemented; the remaining work is pointing the suite at a
+real `neuriplo-kserve-runtime` so client-server execution is proven against a
+server rather than a metadata responder.
 
 Phase 5 is complete. The harness starts the web and server processes itself,
 supplies its own producer, and asserts what a run meant: a successful run by

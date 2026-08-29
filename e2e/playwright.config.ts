@@ -45,6 +45,11 @@ const webPort = Number(process.env.NEURIPLO_UI_WEB_PORT ?? 5173);
 const apiPort = Number(process.env.NEURIPLO_UI_API_PORT ?? 5174);
 const apiUrl = `http://127.0.0.1:${apiPort}`;
 
+// A KServe V2 metadata responder, so the remote lookup is exercised without a
+// network. It serves no inference: the serving half needs a real runtime.
+const remotePort = Number(process.env.NEURIPLO_UI_REMOTE_PORT ?? 5175);
+export const remoteUrl = `http://127.0.0.1:${remotePort}`;
+
 const logs = join(here, "test-results");
 
 /**
@@ -105,6 +110,15 @@ export default defineConfig({
       stdout: "pipe",
       stderr: "pipe",
       timeout: 180_000,
+    },
+    {
+      command: `node ${join(here, "fixtures/remote/kserve-fixture.mjs")} ${remotePort}`,
+      cwd: repository,
+      url: `${remoteUrl}/v2`,
+      reuseExistingServer: !process.env.CI,
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 30_000,
     },
     {
       // `vite preview` is invoked directly rather than through the workspace's

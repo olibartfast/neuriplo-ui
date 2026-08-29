@@ -224,10 +224,35 @@ advertising a single backend, which is what every current build does.
 Implementation contract: [Phase 6 — Remote inference and benchmark workflows](phase-6-remote-benchmark.md).
 
 - [x] Expose client-server endpoint/model/version/transport configuration.
-- [ ] Show remote server metadata and advertised platform.
+- [x] Show remote server metadata and advertised platform.
 - [x] Compare local and remote inference runs.
 - [x] Add repeated benchmark runs and summary statistics.
 - [x] Add a compact backend/model comparison view.
+
+Runs are retained in the page so more than one is alive at a time, which is what
+comparison, repetition, and the local-versus-remote question all needed first.
+Comparison marks what differed and stops there: no speedup, no winner, no
+cross-machine normalization, because two runs on different executions differ in
+ways those numbers do not explain.
+
+Repetition is the honest half of the benchmark item. The contract advertises
+`benchmark` and `iterations`, but the run report publishes a single observation
+with nothing per-iteration in it, so a percentile over a producer's own loop
+would have to be invented. What the UI does instead is launch N whole runs,
+sequentially, and summarize what they measured — stated as a summary over runs
+rather than over iterations. Per-iteration statistics remain a producer contract
+extension, exactly like Phase 4's Slice B.
+
+Remote metadata is the adapter's only fetch of a browser-supplied URL, so it is
+confined by `NEURIPLO_UI_REMOTE_ALLOW`, defaulting to loopback, with redirects
+refused and the response bounded. What comes back is displayed and never used to
+narrow a selection: the capabilities contract governs what may be selected, and
+a remote server is not a second source of it.
+
+One item is left, and it is the same dependency Phase 5 deferred: proving the
+serving half of client-server execution needs a running
+`neuriplo-kserve-runtime`. The harness currently starts a fixture that answers
+the KServe metadata paths only.
 
 ## Phase 7 — Packaging and CI integration
 
