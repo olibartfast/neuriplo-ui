@@ -23,6 +23,18 @@ const producer =
 const browseRoot =
   process.env.NEURIPLO_UI_BROWSE_ROOT?.trim() || join(here, "fixtures/assets");
 
+/**
+ * Sources are confined to the same directory.
+ *
+ * Without this the adapter accepts any existing path, and a run turns the file
+ * it was given into an artifact the browser can fetch — so an unconfined
+ * adapter is an arbitrary local-file read for anything that can reach it. The
+ * harness is short-lived and bound to the loopback interface, but neither of
+ * those is a reason to leave the door open. An operator supplying their own
+ * sources sets `NEURIPLO_UI_BROWSE_ROOT` to a directory that contains them.
+ */
+const sourceRoot = process.env.NEURIPLO_UI_SOURCE_ROOT?.trim() || browseRoot;
+
 // Run directories sit beside the traces rather than in the system temp
 // directory, so a failed run's artifacts survive with the report that needs
 // them. Playwright only cleans `outputDir`, which is a sibling of this.
@@ -32,6 +44,21 @@ const runRoot =
 const webPort = Number(process.env.NEURIPLO_UI_WEB_PORT ?? 5173);
 const apiPort = Number(process.env.NEURIPLO_UI_API_PORT ?? 5174);
 const apiUrl = `http://127.0.0.1:${apiPort}`;
+
+const logs = join(here, "test-results");
+
+/**
+ * Builds, then starts a server with its output both forwarded and written to a
+ * file that survives the run.
+ *
+ * Playwright's own `stdout: "pipe"` only forwards to the runner's terminal, so
+ * on CI the logs would live in the job output and not in the uploaded
+ * artifact. `test-results` is a sibling of `outputDir`, which Playwright
+ * cleans, so these outlive the tests that needed them.
+ */
+function serve(name: string, build: string, start: string): string {
+  return `npm run ${build} && mkdir -p ${logs} && ${start} 2>&1 | tee ${join(logs, `${name}.log`)}`;
+}
 
 export default defineConfig({
   testDir: "./tests",
@@ -57,12 +84,17 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "npm run build:server && node apps/server/dist/index.js",
+      command: serve(
+        "adapter",
+        "build:server",
+        "node apps/server/dist/index.js",
+      ),
       cwd: repository,
       url: `${apiUrl}/api/health`,
       env: {
         NEURIPLO_INFER_BIN: producer,
         NEURIPLO_UI_BROWSE_ROOT: browseRoot,
+        NEURIPLO_UI_SOURCE_ROOT: sourceRoot,
         NEURIPLO_UI_RUN_ROOT: runRoot,
         HOST: "127.0.0.1",
         PORT: String(apiPort),
@@ -75,7 +107,15 @@ export default defineConfig({
       timeout: 180_000,
     },
     {
-      command: `npm run build:web && npm --workspace @neuriplo-ui/web run preview -- --port ${webPort} --strictPort`,
+      // `vite preview` is invoked directly rather than through the workspace's
+      // own script, which binds 0.0.0.0. The harness serves a page that proxies
+      // to an adapter that runs binaries and reads files, and it has no
+      // business being reachable from the network.
+      command: serve(
+        "web",
+        "build:web",
+        `npm --workspace @neuriplo-ui/web exec -- vite preview --host 127.0.0.1 --port ${webPort} --strictPort`,
+      ),
       cwd: repository,
       url: `http://127.0.0.1:${webPort}`,
       env: { NEURIPLO_UI_API: apiUrl },

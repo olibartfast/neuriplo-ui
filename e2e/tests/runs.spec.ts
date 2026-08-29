@@ -5,6 +5,7 @@ import {
   IMAGE_FIXTURE_SIZE,
   capabilitiesOf,
   configureRun,
+  expectRunOutcome,
   isFixtureProducer,
   launchRun,
   taskForFamily,
@@ -17,8 +18,13 @@ import {
  * Every selection here is derived from the advertised contract, so the suite
  * runs against a real `neuriplo-infer` as well as the fixture producer. The
  * assertions that need a known output check the advertised producer version
- * first: a real binary handed a placeholder for weights fails, legitimately,
- * and a failed run is not a failed test.
+ * first.
+ *
+ * A real binary handed the committed placeholders fails, legitimately — but
+ * `expectRunOutcome` still requires it to fail past configuration, on the
+ * inputs it was given, so a binary that rejects every command line cannot pass.
+ * Point `NEURIPLO_UI_E2E_IMAGE` and `NEURIPLO_UI_E2E_WEIGHTS` at real inputs
+ * and the same tests demand success instead.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -125,8 +131,7 @@ test("reports a completed run as a reproducible report", async ({ page }) => {
   const capabilities = await capabilitiesOf(page);
   const task = taskForFamily(capabilities, "image")!;
   await configureRun(page, capabilities, { task });
-  const status = await launchRun(page);
-  expect(status).toMatch(/Succeeded|Failed/);
+  await expectRunOutcome(page, capabilities, await launchRun(page));
 
   // The command is rendered from the argument array the adapter spawned, so
   // copying it reproduces the run outside the browser.
@@ -159,16 +164,13 @@ for (const family of FAMILIES) {
 
     await configureRun(page, capabilities, { task: task! });
     const status = await launchRun(page);
+    await expectRunOutcome(page, capabilities, status);
 
-    // A real producer handed placeholder weights fails in model load, which is
-    // a terminal state this suite accepts; the fixture must succeed.
     if (!isFixtureProducer(capabilities)) {
-      expect(status).toMatch(/Succeeded|Failed/);
       await expect(page.getByTestId("run-command")).toContainText("--type=");
       return;
     }
 
-    expect(status).toBe("Succeeded");
     await expect(page.getByTestId("artifacts")).toBeVisible();
     await expectArtifactFor(page, task!.sources.types[0]);
 
@@ -203,11 +205,7 @@ test("runs each advertised local backend", async ({ page }) => {
     // The backend is validated and echoed back rather than passed on the
     // command line, so the header is where it has to appear.
     await expect(page.getByTestId("run-header")).toContainText(backend);
-    if (isFixtureProducer(capabilities)) {
-      expect(status).toBe("Succeeded");
-    } else {
-      expect(status).toMatch(/Succeeded|Failed/);
-    }
+    await expectRunOutcome(page, capabilities, status);
   }
 });
 
@@ -231,12 +229,9 @@ test("runs the client-server workflow", async ({ page }) => {
   }
 
   // Without a remote runtime this only proves the UI and adapter halves; a
-  // deterministic server belongs to Phase 6.
-  if (isFixtureProducer(capabilities)) {
-    expect(status).toBe("Succeeded");
-  } else {
-    expect(status).toMatch(/Succeeded|Failed/);
-  }
+  // deterministic server belongs to Phase 6. A real producer with nothing
+  // listening still has to fail past configuration.
+  await expectRunOutcome(page, capabilities, status, { remote: true });
 });
 
 async function expectArtifactFor(page: Page, sourceType: string) {

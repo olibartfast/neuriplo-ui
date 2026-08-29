@@ -157,13 +157,30 @@ NEURIPLO_INFER_BIN=/path/to/neuriplo-infer npm run test:e2e
 
 The two assertions that need a known output — a successful run's artifact,
 result and metrics, and a failure attributed to a named stage — check the
-advertised `producer.version` first and skip when it is not the fixture's. A
-real binary handed a placeholder for weights fails, legitimately, and a failed
-run is not a failed test.
+advertised `producer.version` first and skip when it is not the fixture's.
+
+The committed assets are placeholders, so a real binary fails on them. That is
+still held to something: the run must fail *past configuration*, in the stage
+the producer attributes to the inputs it was given, so a binary that rejects
+every command line the adapter builds cannot keep the suite green. Point the
+suite at inputs a real binary can load and the same tests demand success:
+
+| Variable | Purpose |
+| --- | --- |
+| `NEURIPLO_UI_E2E_IMAGE` | Image source used for every image-sourced family. |
+| `NEURIPLO_UI_E2E_VIDEO` | Video source. |
+| `NEURIPLO_UI_E2E_WEIGHTS` | Weights for every parameter the contract types as a path. |
+| `NEURIPLO_UI_BROWSE_ROOT` | Directory the picker browses and sources are confined to; the assets above must live under it. |
+
+The harness binds both servers to `127.0.0.1` and confines sources to the
+browse root. Both matter: the page proxies to an adapter that spawns binaries
+and turns the files it is given into artifacts the browser can fetch, so an
+unconfined adapter reachable from the network is an arbitrary local-file read.
 
 An operator already running `npm run dev` keeps their own servers and producer;
-set `CI=1` to force fresh ones. A failing test leaves a trace, a screenshot, a
-video, and both server logs under `e2e/test-results/`.
+set `CI=1` to force fresh ones. A failing test leaves a trace, a screenshot and
+a video under `e2e/test-results/output/`, alongside `adapter.log` and `web.log`
+for the two servers.
 
 ## Specifications
 
