@@ -2,9 +2,9 @@
   // Optional, and only worth having for one reason: the browser matrix.
   //
   // A fresh clone needs `npm ci` and then `playwright install --with-deps
-  // chromium`, and that second step wants apt and root. It is fine on Ubuntu
-  // and awkward everywhere else. This image ships the browsers and their
-  // system libraries already, so E2E setup is `npm ci` and nothing more —
+  // chromium`, and that second step wants apt and root on the host. It is fine
+  // on Ubuntu and awkward everywhere else. This image ships the browsers and
+  // their system libraries already, so E2E setup is `npm ci` and nothing more —
   // verified by running the suite in this image with no install step.
   //
   // What it does not simplify is the real-producer path. A `neuriplo-infer`
@@ -19,6 +19,32 @@
   // library expects, and Playwright says so at run time rather than silently
   // testing something else.
   "image": "mcr.microsoft.com/playwright:v1.62.1-noble",
+
+  // The image defaults to root, which is the wrong thing to inherit: every
+  // terminal, test, and browser would run as root, and `npm ci` leaves
+  // root-owned files behind in the bind-mounted workspace — measured at 8,069
+  // of them from a single run.
+  //
+  // `ubuntu` rather than the image's `pwuser`, because of the uids. This is a
+  // Noble image, so `ubuntu` already holds uid 1000 and `pwuser` is 1001.
+  // Remapping pwuser to a host uid of 1000 therefore collides with an existing
+  // user and fails, leaving the workspace unwritable; `ubuntu` matches the
+  // common Linux host uid as it stands, and needs no remap at all. It reads
+  // /ms-playwright and runs the browsers fine, which is the only thing pwuser
+  // was needed for.
+  "remoteUser": "ubuntu",
+
+  "runArgs": [
+    // Docker gives a container 64 MB of /dev/shm, and Chromium exhausts it and
+    // crashes. Playwright's own Docker guidance is `--ipc=host`, which is what
+    // this uses; the container is a local developer tool on a machine its user
+    // already owns. `--shm-size=1gb` is the more isolated alternative if that
+    // trade is not wanted, and fixes the same crash.
+    "--ipc=host",
+    // Reaps the browser subprocesses Chromium leaves behind, which otherwise
+    // accumulate as zombies across a session's worth of runs.
+    "--init"
+  ],
 
   // The image brings its own Node, which satisfies the `engines` floor but is
   // not the version CI pins. CI remains the authority on what is supported.
