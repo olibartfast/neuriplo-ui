@@ -2,7 +2,10 @@
   "name": "neuriplo-ui",
   "private": true,
   "version": "0.1.0",
-  "workspaces": ["apps/*", "e2e"],
+  "workspaces": [
+    "apps/*",
+    "e2e"
+  ],
   "scripts": {
     "dev": "npm-run-all --parallel dev:web dev:server",
     "dev:web": "npm --workspace @neuriplo-ui/web run dev",
@@ -23,6 +26,7 @@
     "node": ">=22.12.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.11",
     "npm-run-all": "^4.1.5"
   }
 }

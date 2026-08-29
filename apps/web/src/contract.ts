@@ -99,7 +99,7 @@ export async function fetchCapabilities(
   let response: Response;
   try {
     response = await fetch("/api/capabilities", { signal });
-  } catch (cause) {
+  } catch {
     throw new CapabilitiesFetchError(
       "unreachable",
       "Could not reach the local Neuriplo adapter.",

@@ -113,7 +113,7 @@ export async function startRun(
       body: JSON.stringify(buildRunRequest(resolved)),
       signal,
     });
-  } catch (cause) {
+  } catch {
     throw new RunFailedError(
       "unreachable",
       "Could not reach the local Neuriplo adapter.",

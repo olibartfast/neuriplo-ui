@@ -1,0 +1,65 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
+
+  // One tool formats and lints the whole repository. The alternative — ESLint
+  // with typescript-eslint, a React plugin, Prettier, and the config that stops
+  // the two fighting — is roughly ten packages to do this job for a repository
+  // whose entire runtime dependency list is Fastify and React.
+
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": ["**", "!**/dist", "!**/playwright-report", "!**/test-results"]
+  },
+
+  // Matches the style already written throughout, so adopting the formatter
+  // restyles nothing.
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 80
+  },
+
+  "javascript": {
+    "formatter": { "quoteStyle": "double" },
+    // The component tests are compiled by tsx with the classic JSX runtime, so
+    // `import React` is used by every tag in the file even though no expression
+    // names it. Told this, the linter stops reporting those imports as unused —
+    // the fix it offered would have deleted them and broken the tests.
+    "jsxRuntime": "reactClassic"
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "a11y": {
+        // Every control in the configurator is rendered by a nested component
+        // or helper — `PathField` returns the input, `renderControl` returns
+        // the input or select — and the rule only inspects the JSX written
+        // directly inside the label. The controls really are inside their
+        // labels at runtime, which `apps/web/test/label.test.tsx` asserts
+        // rather than leaving to this comment.
+        "noLabelWithoutControl": "off"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // A non-null assertion in a spec is a claim the test has already
+      // guaranteed — usually by a `test.skip` a statement earlier, which
+      // TypeScript cannot connect to the lookup that follows. When such a claim
+      // is wrong the test fails immediately and loudly, which is the behaviour
+      // the rule exists to protect elsewhere. It stays enforced in `apps/`,
+      // where a wrong assumption reaches a user instead.
+      "includes": ["e2e/tests/**"],
+      "linter": { "rules": { "style": { "noNonNullAssertion": "off" } } }
+    }
+  ],
+
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  }
+}
