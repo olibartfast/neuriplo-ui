@@ -183,7 +183,7 @@ Implementation contract: [Phase 5 — Real E2E matrix](phase-5-e2e-matrix.md).
 - [x] Add deterministic fixture assets.
 - [x] Test at least one pipeline per major task family.
 - [x] Test local backend switching when CI runners support the backend.
-- [ ] Test client-server execution against a deterministic test runtime.
+- [x] Test client-server execution against a deterministic test runtime.
 - [x] Assert output artifact creation.
 - [x] Assert structured result semantics rather than only HTTP success.
 - [x] Store Playwright traces and logs on failure.
@@ -249,10 +249,16 @@ refused and the response bounded. What comes back is displayed and never used to
 narrow a selection: the capabilities contract governs what may be selected, and
 a remote server is not a second source of it.
 
-One item is left, and it is the same dependency Phase 5 deferred: proving the
-serving half of client-server execution needs a running
-`neuriplo-kserve-runtime`. The harness currently starts a fixture that answers
-the KServe metadata paths only.
+The dependency Phase 5 deferred is now met. `NEURIPLO_UI_E2E_RUNTIME` points the
+harness at a built `neuriplo-kserve-runtime`, whose stub backend serves KServe
+V2 without a model, and a client-server run completes through the browser
+against it. Without one, a fixture responder still answers the metadata paths.
+
+What stays opt-in is the full round trip, and for a contract reason: the stub
+serves fixed tensor shapes, and nothing advertises what tensors a task expects,
+so the suite cannot choose a compatible selector without encoding producer
+knowledge. `NEURIPLO_UI_E2E_REMOTE_MODEL` lets the operator name one, and the
+run is then required to succeed.
 
 ## Phase 7 — Packaging and CI integration
 

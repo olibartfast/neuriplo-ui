@@ -8,6 +8,9 @@ import {
   expectRunOutcome,
   isFixtureProducer,
   launchRun,
+  REMOTE_MODEL,
+  remoteRoundTripModel,
+  remoteServerName,
   setParameter,
   taskForFamily,
   type Family,
@@ -328,10 +331,15 @@ test("describes the remote server the endpoint addresses", async ({ page }) => {
   const task = taskForFamily(capabilities, "image")!;
   await configureRun(page, capabilities, { task, workflow: "client_server" });
 
-  // The server describes itself whatever else is configured.
+  // The panel must show what the server said, so the expected name is read
+  // from the server rather than written into the suite — which keeps this true
+  // whether the fixture responder or a real runtime is answering.
+  const named = await remoteServerName();
+  expect(named).not.toBeNull();
+
   const metadata = page.getByTestId("remote-metadata");
   await expect(metadata).toBeVisible({ timeout: 15_000 });
-  await expect(metadata).toContainText("neuriplo-kserve-runtime-fixture");
+  await expect(metadata).toContainText(named!);
 
   // Model metadata needs a model to ask about, found the way the UI finds it:
   // a string parameter whose id names a model rather than a version.
@@ -349,7 +357,9 @@ test("describes the remote server the endpoint addresses", async ({ page }) => {
     "the contract advertises no remote model parameter",
   );
 
-  await setParameter(page, modelParameter!, task.models[0].id);
+  // The name both remotes publish, so the assertion does not depend on which
+  // of them the harness started.
+  await setParameter(page, modelParameter!, REMOTE_MODEL);
 
   // Whether the server knows this model depends on what it serves, and both
   // answers are legitimate — the panel has to state which one it got.
@@ -397,6 +407,55 @@ test("refuses an endpoint outside the adapter's allowlist", async ({ page }) => 
 
   // A refusal describes nothing about the server and blocks nothing.
   await expect(page.getByTestId("run")).toBeEnabled();
+});
+
+test("completes a client-server run against the deterministic runtime", async ({
+  page,
+}) => {
+  const selector = remoteRoundTripModel();
+  test.skip(
+    selector === null,
+    "set NEURIPLO_UI_E2E_REMOTE_MODEL to a selector the runtime's stub tensors fit",
+  );
+
+  const capabilities = await capabilitiesOf(page);
+  const remote = capabilities.execution.workflows.find(
+    (workflow) => workflow.id === "client_server",
+  );
+  test.skip(remote === undefined, "the build advertises no client-server workflow");
+
+  const task = capabilities.tasks.find((candidate) =>
+    candidate.models.some((model) => model.id === selector),
+  );
+  test.skip(
+    task === undefined,
+    `no advertised task offers the model ${selector}`,
+  );
+
+  await configureRun(page, capabilities, {
+    task: task!,
+    workflow: "client_server",
+    model: selector!,
+  });
+
+  const parameters = [
+    ...remote!.parameters.required,
+    ...remote!.parameters.optional,
+  ];
+  const modelParameter = parameters.find(
+    (id) =>
+      capabilities.parameters[id]?.value_type === "string" &&
+      /model/i.test(id) &&
+      !/version/i.test(id),
+  );
+  if (modelParameter) await setParameter(page, modelParameter, REMOTE_MODEL);
+
+  // This is the whole point of the slice: inference actually served by a
+  // remote, not a metadata responder standing in for one.
+  expect(await launchRun(page)).toBe("Succeeded");
+  await expect(page.getByTestId("run-header")).toContainText("client_server");
+  await expect(page.getByTestId("artifacts")).toBeVisible();
+  await expect(page.locator('[data-testid^="artifact-preview-"]').first()).toBeVisible();
 });
 
 const FAMILIES: Family[] = ["image", "multi_source", "video", "prompted"];
