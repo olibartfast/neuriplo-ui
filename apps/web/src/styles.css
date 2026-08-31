@@ -1,9 +1,35 @@
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=Orbitron:wght@700;900&display=swap");
+
+/* The whole theme derives from these. The structure below is the modernist
+   pass — zero radius, 2px rules, flush-left primary button — with the
+   cyberpunk ramp layered over it: near-black ground, neon cyan accent,
+   magenta for anything that differs or failed. */
 :root {
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+  --color-bg: #05070a;
+  --color-surface: #0a0f18;
+  --color-text: #cdf9ff;
+  --color-accent: #00f0ff;
+  --color-accent-100: #05262c;
+  --color-accent-700: #35e6f2;
+  --color-accent-2: #ff2bd6;
+  --color-accent-2-100: #300a24;
+  --color-accent-2-700: #ff78e5;
+  --color-divider: color-mix(in srgb, #00f0ff 45%, transparent);
+  --color-muted: color-mix(in srgb, #cdf9ff 60%, transparent);
+  --font-body:
+    "Archivo", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  color: #e8edf7;
-  background: #0b1020;
+  --font-heading: "Orbitron", var(--font-body);
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --shadow-sm: 0 0 4px color-mix(in srgb, #00f0ff 45%, transparent);
+  --shadow-md:
+    0 0 14px color-mix(in srgb, #00f0ff 40%, transparent),
+    0 0 2px color-mix(in srgb, #00f0ff 70%, transparent);
+  --shadow-lg: 0 0 40px color-mix(in srgb, #ff2bd6 45%, transparent);
+
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
   font-synthesis: none;
 }
 
@@ -20,6 +46,23 @@ select {
   font: inherit;
 }
 
+/* Scanline wash over the whole console. Decorative and inert — it must never
+   swallow a click meant for the page under it. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 240, 255, 0.05) 0px,
+    rgba(0, 240, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
 .page-shell {
   width: min(1040px, calc(100% - 32px));
   margin: 0 auto;
@@ -31,28 +74,91 @@ header {
 }
 .eyebrow {
   margin: 0 0 8px;
+  font-family: var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-weight: 700;
-  color: #8fa8ff;
+  font-weight: 900;
+  color: var(--color-accent);
+  animation: cp-glitch 6s steps(1) infinite;
 }
 h1 {
   margin: 0;
+  font-family: var(--font-heading);
+  font-weight: 700;
   font-size: clamp(2rem, 5vw, 3.75rem);
   line-height: 1;
+  letter-spacing: 0.04em;
 }
 .subtitle {
   max-width: 680px;
-  color: #aeb8ce;
+  color: var(--color-muted);
   font-size: 1.05rem;
 }
 
+@keyframes cp-glitch {
+  0%,
+  92%,
+  100% {
+    text-shadow: none;
+    transform: none;
+  }
+  93% {
+    text-shadow:
+      -2px 0 var(--color-accent-2),
+      2px 0 var(--color-accent);
+    transform: translateX(-1px);
+  }
+  95% {
+    text-shadow:
+      2px 0 var(--color-accent-2),
+      -2px 0 var(--color-accent);
+    transform: translateX(1px);
+  }
+  97% {
+    text-shadow: none;
+    transform: none;
+  }
+}
+@keyframes cp-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The producer line only renders once neuriplo-infer has answered, so the
+   live dot beside it is claiming exactly what the text already claims. */
+[data-testid="producer"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-testid="producer"]::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow:
+    0 0 6px var(--color-accent),
+    0 0 12px var(--color-accent);
+  animation: cp-blink 1.6s ease-in-out infinite;
+}
+
 .panel {
-  border: 1px solid #27324e;
-  background: #11182b;
-  border-radius: 16px;
+  border: 2px solid var(--color-divider);
+  background: var(--color-surface);
+  border-radius: 0;
   padding: 24px;
   margin-top: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .grid {
@@ -68,33 +174,64 @@ label {
 }
 select {
   width: 100%;
-  border: 1px solid #35415f;
-  border-radius: 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
   padding: 12px 14px;
-  color: #e8edf7;
-  background: #0c1324;
+  color: var(--color-text);
+  background: var(--color-bg);
 }
 
 button {
   margin-top: 24px;
-  border: 0;
-  border-radius: 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
   padding: 12px 18px;
+  font-family: var(--font-heading);
   font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  display: inline-flex;
+  justify-content: flex-start;
+  text-align: left;
+}
+button:hover {
+  background: var(--color-accent-700);
+  box-shadow: var(--shadow-md);
+}
+button:active {
+  background: var(--color-accent-2);
+  box-shadow: var(--shadow-lg);
 }
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
+  box-shadow: none;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 button.inline {
   margin-top: 8px;
   justify-self: start;
   padding: 6px 12px;
+  font-family: var(--font-body);
   font-size: 0.8rem;
   font-weight: 600;
-  color: #cbd5f0;
-  background: #1b2440;
+  letter-spacing: normal;
+  color: var(--color-accent);
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  justify-content: center;
+}
+button.inline:hover {
+  background: var(--color-accent-100);
+  box-shadow: var(--shadow-sm);
 }
 
 .artifacts {
@@ -107,11 +244,14 @@ button.inline {
   flex-direction: column;
   gap: 10px;
   padding: 12px 0;
-  border-top: 1px solid #27324e;
+  border-top: 2px solid var(--color-divider);
 }
 .artifacts a {
-  color: #8fa8ff;
+  color: var(--color-accent-700);
   word-break: break-all;
+}
+.artifacts a:hover {
+  color: var(--color-accent);
 }
 
 .artifact-meta {
@@ -125,19 +265,22 @@ button.inline {
   display: block;
   max-width: 100%;
   height: auto;
-  border: 1px solid #27324e;
-  border-radius: 10px;
-  background: #0c1324;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: var(--color-bg);
 }
+
 .hint,
 .empty-state p {
-  color: #8f9ab2;
+  color: var(--color-muted);
 }
 .empty-state {
   min-height: 180px;
 }
 .empty-state span {
+  font-family: var(--font-heading);
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 @media (max-width: 680px) {
@@ -150,13 +293,17 @@ button.inline {
 }
 
 .notice {
-  border-color: #5a3a4a;
-  background: #1c1320;
+  border-color: var(--color-accent-2);
+  background: var(--color-accent-2-100);
+  box-shadow: var(--shadow-lg);
 }
 .notice span {
+  font-family: var(--font-heading);
   font-weight: 700;
+  letter-spacing: 0.04em;
   display: block;
   margin-bottom: 8px;
+  color: var(--color-accent-2-700);
 }
 
 .parameters {
@@ -164,20 +311,23 @@ button.inline {
 }
 .parameters h2 {
   margin: 0 0 16px;
+  font-family: var(--font-heading);
   font-size: 0.95rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #8fa8ff;
+  color: var(--color-accent);
 }
 
 .advanced {
   margin-top: 24px;
-  border-top: 1px solid #27324e;
+  border-top: 2px solid var(--color-divider);
   padding-top: 16px;
 }
 .advanced summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-accent-700);
 }
 .advanced .parameters {
   margin-top: 16px;
@@ -186,38 +336,39 @@ button.inline {
 input[type="text"],
 input[type="number"] {
   width: 100%;
-  border: 1px solid #35415f;
-  border-radius: 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
   padding: 12px 14px;
-  color: #e8edf7;
-  background: #0c1324;
+  color: var(--color-text);
+  background: var(--color-bg);
   font: inherit;
 }
 input[aria-invalid="true"] {
-  border-color: #ff7895;
+  border-color: var(--color-accent-2);
 }
 input[type="checkbox"] {
   justify-self: start;
   width: 20px;
   height: 20px;
+  accent-color: var(--color-accent);
 }
 
 select:disabled {
   opacity: 0.6;
 }
 .required {
-  color: #ff9bb0;
+  color: var(--color-accent-2-700);
   font-style: normal;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.8rem;
 }
 .flag {
-  color: #6d7893;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
 }
 .field-error {
-  color: #ff9bb0;
+  color: var(--color-accent-2-700);
   font-size: 0.8rem;
 }
 
@@ -243,7 +394,7 @@ select:disabled {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(6, 10, 20, 0.72);
+  background: color-mix(in srgb, #05070a 80%, transparent);
 }
 
 .browser {
@@ -253,19 +404,22 @@ select:disabled {
   width: min(640px, 100%);
   max-height: min(560px, 100%);
   padding: 20px;
-  border: 1px solid #35415f;
-  border-radius: 14px;
-  background: #111a30;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  border: 2px solid var(--color-divider);
+  border-radius: 0;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
 }
 .browser h2 {
   margin: 0;
+  font-family: var(--font-heading);
   font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 .browser-path {
   margin: 0;
-  color: #8f9ab2;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   word-break: break-all;
 }
@@ -273,9 +427,9 @@ select:disabled {
 .browser-list {
   flex: 1 1 auto;
   overflow-y: auto;
-  border: 1px solid #27324e;
-  border-radius: 10px;
-  background: #0c1324;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: var(--color-bg);
 }
 .browser-list > p {
   margin: 0;
@@ -290,18 +444,25 @@ select:disabled {
   width: 100%;
   margin: 0;
   padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--color-divider);
   border-radius: 0;
-  color: #e8edf7;
+  color: var(--color-text);
   background: transparent;
+  font-family: var(--font-body);
   font-weight: 500;
+  letter-spacing: normal;
   text-align: left;
   cursor: pointer;
+  box-shadow: none;
 }
 .browser-entry:hover {
-  background: #1b2440;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  box-shadow: none;
 }
 .browser-entry[aria-pressed="true"] {
-  background: #24325c;
+  background: var(--color-accent-100);
+  border-color: var(--color-accent);
 }
 .browser-entry span:first-child {
   word-break: break-all;
@@ -333,28 +494,30 @@ select:disabled {
   min-width: 0;
 }
 .run-header dt {
-  color: #8f9ab2;
+  color: var(--color-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 .run-header dd {
   margin: 4px 0 0;
-  font-weight: 600;
+  font-weight: 700;
   word-break: break-word;
 }
 
 .result-section {
   margin-top: 24px;
-  border-top: 1px solid #27324e;
+  border-top: 2px solid var(--color-divider);
   padding-top: 16px;
 }
 .result-section h2 {
   margin: 0 0 12px;
+  font-family: var(--font-heading);
   font-size: 0.95rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #8fa8ff;
+  color: var(--color-accent);
 }
 .result-section .artifacts li:first-child {
   border-top: 0;
@@ -366,16 +529,14 @@ pre.json,
 pre.log-body {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid #27324e;
-  border-radius: 10px;
-  background: #0c1324;
-  color: #dbe3f7;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.5;
 }
-/* The command is one line and must stay copyable verbatim, so it scrolls
-   sideways instead of wrapping. */
 pre.command {
   overflow-x: auto;
 }
@@ -405,15 +566,15 @@ pre.log-body {
 }
 .log summary {
   cursor: pointer;
-  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-accent-700);
 }
 .log pre {
   margin-top: 8px;
 }
 
-/* Run history: one row per completed run, newest first. */
 .history {
   list-style: none;
   margin: 0;
@@ -429,15 +590,27 @@ pre.log-body {
   align-items: baseline;
   text-align: left;
   padding: 8px 10px;
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: normal;
   font-size: 0.85rem;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--color-divider);
+  box-shadow: none;
+}
+.history-entry:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  box-shadow: none;
 }
 .history-what {
-  font-weight: 600;
+  font-weight: 700;
 }
 .history-how,
 .history-when {
   font-size: 0.8rem;
-  opacity: 0.75;
+  color: var(--color-muted);
 }
 @media (max-width: 640px) {
   .history-entry {
@@ -451,9 +624,9 @@ pre.log-body {
   gap: 8px;
 }
 .history-row.selected {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 0;
 }
 .history-compare {
   display: flex;
@@ -472,7 +645,6 @@ pre.log-body {
   white-space: nowrap;
 }
 
-/* Comparison: a wide table scrolls inside itself rather than the page. */
 .comparison-scroll {
   overflow-x: auto;
 }
@@ -485,17 +657,30 @@ pre.log-body {
 .comparison td {
   text-align: left;
   padding: 6px 10px;
-  border-bottom: 1px solid rgba(128, 138, 165, 0.25);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-accent) 25%, transparent);
   white-space: nowrap;
+}
+.comparison th {
+  border-bottom: 2px solid var(--color-divider);
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
 }
 .comparison th[scope="row"] {
   font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.85rem;
+  color: var(--color-text);
 }
 .comparison tr.differs th[scope="row"] {
   font-weight: 700;
+  color: var(--color-accent-2-700);
 }
 .comparison tr.differs td {
-  font-weight: 600;
+  font-weight: 700;
 }
 .comparison td.absent {
   opacity: 0.55;
@@ -515,8 +700,20 @@ pre.log-body {
 }
 .launch .repeat span {
   font-size: 0.8rem;
-  color: #6d7893;
+  color: var(--color-muted);
 }
 .launch .repeat input {
   width: 72px;
+}
+
+/* The glitch, the blink and the scanline are flavour. Anyone who has asked
+   the OS to stop moving things gets the same console, still. */
+@media (prefers-reduced-motion: reduce) {
+  .eyebrow,
+  [data-testid="producer"]::before {
+    animation: none;
+  }
+  body::after {
+    display: none;
+  }
 }
