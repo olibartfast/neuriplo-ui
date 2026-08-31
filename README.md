@@ -4,7 +4,7 @@ Web UI and end-to-end test harness for the Neuriplo inference pipeline.
 
 Neuriplo UI is intentionally kept separate from `neuriplo-infer`. The UI configures and launches inference runs through a small local API adapter while `neuriplo-infer` remains the source of truth for inference behavior and capabilities.
 
-![The Neuriplo UI configurator after a completed object-detection run, showing the discovered task, model, backend, and source controls above the rendered output image.](docs/ui.png)
+![The Neuriplo UI configurator after a completed object-detection run, showing the discovered task, model, backend, and source controls above the run report: producer metrics, the spawned command, and the rendered output image.](docs/ui.png)
 
 Every control above is generated from the capabilities the binary advertises;
 nothing in the frontend knows what a task, model, or backend is.
