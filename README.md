@@ -19,6 +19,25 @@ backend selection, processed results, and client-server inference.
 - Retain, repeat, and compare runs in the current browser session.
 - Exercise the workflow with Playwright.
 
+## Repositories
+
+Neuriplo is split across independently versioned repositories:
+
+| Repository | Role |
+| --- | --- |
+| [neuriplo-ui](https://github.com/olibartfast/neuriplo-ui) | Web interface, local API adapter and browser tests. |
+| [neuriplo-infer](https://github.com/olibartfast/neuriplo-infer) | C++ executable that runs local and client-server inference. |
+| [neuriplo](https://github.com/olibartfast/neuriplo) | Inference backend integrations. |
+| [neuriplo-tasks](https://github.com/olibartfast/neuriplo-tasks) | Task contracts, preprocessing, postprocessing and model export tools. |
+| [videocapture](https://github.com/olibartfast/videocapture) | Image/video capture and output writing. |
+| [neuriplo-kserve-client](https://github.com/olibartfast/neuriplo-kserve-client) | KServe V2 HTTP/gRPC client used by the inference application. |
+| [neuriplo-kserve-runtime](https://github.com/olibartfast/neuriplo-kserve-runtime) | Optional KServe-compatible model server. |
+| [nert](https://github.com/olibartfast/nert) | Experimental first-party ONNX inference runtime. |
+| [neuriplo-platform](https://github.com/olibartfast/neuriplo-platform) | Architecture, compatibility sets and ecosystem documentation. |
+
+The inference application pins its C++ dependencies; their version numbers do
+not need to match. The UI discovers the capabilities compiled into that application.
+
 ## Quick start
 
 ```bash
