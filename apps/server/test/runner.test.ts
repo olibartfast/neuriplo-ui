@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 import {
   executeRun,
@@ -23,6 +30,55 @@ async function fakeBinary(directory: string, body: string): Promise<string> {
 async function scratch(): Promise<string> {
   return mkdtemp(join(tmpdir(), "neuriplo-ui-test-"));
 }
+
+test("isolates source-relative outputs and excludes staged inputs", async (context) => {
+  const directory = await scratch();
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const sources: string[] = [];
+  for (const folder of ["first", "second"]) {
+    const path = join(directory, folder);
+    await mkdir(path);
+    const source = join(path, "frame.png");
+    await writeFile(source, folder);
+    sources.push(source);
+  }
+  const binaryPath = await fakeBinary(
+    directory,
+    `
+    import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+    import { dirname, join } from "node:path";
+    const paths = process.argv.find(a => a.startsWith("--source=")).slice(9).split(",");
+    const output = join(dirname(paths[0]), "output");
+    mkdirSync(output);
+    writeFileSync(join(output, "flow.png"), paths.map(p => readFileSync(p, "utf8")).join("+"));
+  `,
+  );
+  const outcome = await executeRun([`--source=${sources.join(",")}`], {
+    binaryPath,
+    runRoot: join(directory, "runs"),
+  });
+  assert.equal(outcome.exitCode, 0);
+  assert.equal(outcome.artifacts.length, 1);
+  assert.equal(outcome.artifacts[0].name, "inputs/0/output/flow.png");
+  assert.equal(
+    await readFile(join(outcome.directory, outcome.artifacts[0].name), "utf8"),
+    "first+second",
+  );
+  const staged = outcome.args[0].slice("--source=".length).split(",");
+  assert.deepEqual(
+    staged.map((source) => basename(source)),
+    ["frame.png", "frame.png"],
+  );
+  assert.notEqual(staged[0], staged[1]);
+  assert.notEqual(outcome.args[0], `--source=${sources.join(",")}`);
+  for (const source of sources) {
+    assert.equal(
+      await readFile(source, "utf8"),
+      source.includes("first") ? "first" : "second",
+    );
+    await assert.rejects(access(join(source, "..", "output")));
+  }
+});
 
 test("captures stdout, stderr, exit code, and artifacts", async (context) => {
   const directory = await scratch();

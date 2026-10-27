@@ -47,6 +47,8 @@ jobs:
 
       - run: npm test
 
+      - run: python3 scripts/test_validate_stack.py
+
       # The E2E suite supplies its own producer, so the runner needs a browser
       # and nothing else: no models, no weights, no compiled neuriplo-infer.
       - run: npm --workspace @neuriplo-ui/e2e exec -- playwright install --with-deps chromium

@@ -1,5 +1,5 @@
-// Shape of the neuriplo-infer capabilities contract, as defined by
-// docs/capabilities.schema.json in neuriplo-infer.
+// Shape of the neuriplo-infer capabilities contract (schema_version 2), as
+// defined by docs/capabilities.schema.json in neuriplo-infer.
 //
 // This file describes the *shape* of the contract only. The set of tasks,
 // models, backends, protocols, sources, and parameters stays authoritative in
@@ -69,13 +69,10 @@ export type CapabilitySourceType = {
 };
 
 export type NeuriploCapabilities = {
-  /**
-   * Whatever version the adapter accepted and passed through — 1 or 2 today.
-   * Not a literal: the adapter is the authority on which versions are
-   * supported, and pinning one here would make a v2 document unrepresentable
-   * while the UI is already displaying it.
-   */
-  schema_version: number;
+  schema_version: 2;
+  diagnostics: {
+    run_report: { schema_version: number; path: string; stages: string[] };
+  };
   producer: { name: "neuriplo-infer"; version: string };
   execution: { workflows: CapabilityWorkflow[] };
   source_types: CapabilitySourceType[];

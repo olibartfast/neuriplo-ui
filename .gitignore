@@ -7,4 +7,6 @@ test-results/
 .env.*
 !.env.example
 .DS_Store
+__pycache__/
+artifacts/
 *.log

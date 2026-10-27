@@ -9,7 +9,14 @@ import {
 } from "../src/capabilities.js";
 
 const fixture: NeuriploCapabilities = {
-  schema_version: 1,
+  schema_version: 2,
+  diagnostics: {
+    run_report: {
+      schema_version: 1,
+      path: "data/output/run_report.json",
+      stages: ["inference"],
+    },
+  },
   producer: { name: "neuriplo-infer", version: "0.7.0" },
   execution: {
     workflows: [
@@ -80,7 +87,7 @@ test("rejects invalid JSON", async () => {
 test("rejects unsupported schema versions", async () => {
   await assert.rejects(
     discoverCapabilities("/opt/neuriplo-infer", async () => ({
-      stdout: JSON.stringify({ ...fixture, schema_version: 3 }),
+      stdout: JSON.stringify({ ...fixture, schema_version: 1 }),
       stderr: "",
     })),
     (error: unknown) =>
@@ -89,9 +96,7 @@ test("rejects unsupported schema versions", async () => {
   );
 });
 
-test("accepts both published schema versions", async () => {
-  // Version 2 added the diagnostics section. A version 1 binary advertises
-  // none, which is already the "no run report" case, so both are usable.
+test("accepts the current capabilities schema", async () => {
   const withDiagnostics = {
     ...fixture,
     schema_version: 2,
@@ -110,12 +115,6 @@ test("accepts both published schema versions", async () => {
   }));
   assert.equal(v2.schema_version, 2);
   assert.equal(runReportContract(v2)?.path, "data/output/run_report.json");
-
-  const v1 = await discoverCapabilities("/opt/neuriplo-infer", async () => ({
-    stdout: JSON.stringify({ ...fixture, schema_version: 1 }),
-    stderr: "",
-  }));
-  assert.equal(runReportContract(v1), null);
 });
 
 test("rejects unresolved parameter references", async () => {
@@ -132,3 +131,59 @@ test("rejects unresolved parameter references", async () => {
       error.code === "invalid_response",
   );
 });
+
+for (const schemaVersion of [0, 3]) {
+  test(`rejects incompatible capabilities schema ${schemaVersion}`, async () => {
+    await assert.rejects(
+      discoverCapabilities("/opt/neuriplo-infer", async () => ({
+        stdout: JSON.stringify({ ...fixture, schema_version: schemaVersion }),
+        stderr: "",
+      })),
+      (error: unknown) =>
+        error instanceof CapabilitiesDiscoveryError &&
+        error.code === "unsupported_schema",
+    );
+  });
+}
+
+for (const diagnostics of [
+  undefined,
+  {},
+  { run_report: null },
+  {
+    run_report: {
+      schema_version: 0,
+      path: "report.json",
+      stages: ["inference"],
+    },
+  },
+  {
+    run_report: {
+      schema_version: 1.5,
+      path: "report.json",
+      stages: ["inference"],
+    },
+  },
+  { run_report: { schema_version: 1, path: "", stages: ["inference"] } },
+  { run_report: { schema_version: 1, path: "report.json", stages: [] } },
+  { run_report: { schema_version: 1, path: "report.json", stages: [""] } },
+  {
+    run_report: {
+      schema_version: 1,
+      path: "report.json",
+      stages: ["inference", "inference"],
+    },
+  },
+]) {
+  test(`rejects malformed diagnostics: ${JSON.stringify(diagnostics)}`, async () => {
+    await assert.rejects(
+      discoverCapabilities("/opt/neuriplo-infer", async () => ({
+        stdout: JSON.stringify({ ...fixture, diagnostics }),
+        stderr: "",
+      })),
+      (error: unknown) =>
+        error instanceof CapabilitiesDiscoveryError &&
+        error.code === "invalid_response",
+    );
+  });
+}

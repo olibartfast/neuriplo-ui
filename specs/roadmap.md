@@ -297,4 +297,8 @@ with `NEURIPLO_UI_HOST` as the opt-in.
 
 ## Guiding rule
 
+Real-stack validation now has a mandatory provenance gate; see
+[build provenance](build-provenance.md). Browser evidence must identify the
+released source revisions and the exact recorded executable and shared libraries.
+
 Do not solve capability drift inside the frontend. When a new task, model, execution workflow, backend, remote protocol, transport, or parameter is added to Neuriplo, prefer extending the machine-readable contract so the UI discovers it rather than adding another hard-coded list.

@@ -1,5 +1,5 @@
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
   CapabilitiesDiscoveryError,
@@ -174,7 +174,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         return reply.code(404).send(failure("not_found", "Unknown artifact"));
       }
 
-      const stats = await stat(target).catch(() => null);
+      const stats = await lstat(target).catch(() => null);
       if (!stats?.isFile()) {
         return reply.code(404).send(failure("not_found", "Unknown artifact"));
       }

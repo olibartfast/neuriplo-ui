@@ -130,10 +130,12 @@ test("shows a failure stage only when a run reported one", () => {
 test("does not call different invocations the same configuration", () => {
   const base = run({
     run_id: "a",
+    source: { type: "image", paths: ["/a.png"] },
     command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] },
   });
   const otherSource = run({
     run_id: "b",
+    source: { type: "image", paths: ["/b.png"] },
     command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/b.png"] },
   });
 
@@ -228,4 +230,27 @@ test("names what varies without interpreting it", () => {
   for (const caption of captions) {
     assert.doesNotMatch(caption, /faster|slower|better|worse|speedup|×/i);
   }
+});
+
+test("private staged paths do not split repeated configurations", () => {
+  const first = run({
+    command: {
+      bin: "/opt/x",
+      args: ["--source=/runs/first/inputs/0/frame.png"],
+    },
+  });
+  const second = run({
+    command: {
+      bin: "/opt/x",
+      args: ["--source=/runs/second/inputs/0/frame.png"],
+    },
+  });
+  assert.equal(sameConfiguration([first, second]), true);
+  assert.equal(
+    sameConfiguration([
+      first,
+      { ...second, source: { type: "image", paths: ["/different/frame.png"] } },
+    ]),
+    false,
+  );
 });

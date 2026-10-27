@@ -115,6 +115,7 @@ test("refuses to aggregate across different configurations", () => {
 test("refuses to aggregate runs whose invocation differed", () => {
   const base = run({
     run_id: "a",
+    source: { type: "image", paths: ["/a.png"] },
     command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/a.png"] },
   });
 
@@ -125,6 +126,7 @@ test("refuses to aggregate runs whose invocation differed", () => {
       base,
       run({
         run_id: "b",
+        source: { type: "image", paths: ["/b.png"] },
         command: { bin: "/opt/x", args: ["--type=yolo26", "--source=/b.png"] },
       }),
     ]),

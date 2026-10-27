@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -12,7 +12,14 @@ import {
 import { RunExecutionError, type RunOutcome } from "../src/runner.js";
 
 const fixture: NeuriploCapabilities = {
-  schema_version: 1,
+  schema_version: 2,
+  diagnostics: {
+    run_report: {
+      schema_version: 1,
+      path: "data/output/run_report.json",
+      stages: ["inference"],
+    },
+  },
   producer: { name: "neuriplo-infer", version: "0.7.0" },
   execution: {
     workflows: [
@@ -44,6 +51,25 @@ const fixture: NeuriploCapabilities = {
     },
   ],
 };
+
+test("artifact URLs cannot expose staged source symlinks", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "neuriplo-source-test-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const runId = "12345678-1234-1234-1234-123456789abc";
+  const runRoot = join(directory, "runs");
+  const inputs = join(runRoot, runId, "inputs", "0");
+  await mkdir(inputs, { recursive: true });
+  const source = join(directory, "original.txt");
+  await writeFile(source, "source contents");
+  await symlink(source, join(inputs, "original.txt"));
+  const app = buildServer({ runner: { runRoot }, logger: false });
+  context.after(() => app.close());
+  const response = await app.inject({
+    method: "GET",
+    url: `/api/runs/${runId}/artifacts/inputs/0/original.txt`,
+  });
+  assert.equal(response.statusCode, 404);
+});
 
 test("GET /api/capabilities returns the CLI contract", async (context) => {
   const app = buildServer({

@@ -36,8 +36,7 @@ export function RunPanel({
 }) {
   const producer = (
     <p className="hint" data-testid="producer">
-      neuriplo-infer {capabilities.producer.version} · schema v
-      {capabilities.schema_version}
+      neuriplo-infer {capabilities.producer.version}
     </p>
   );
 

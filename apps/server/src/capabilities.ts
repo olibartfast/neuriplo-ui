@@ -59,8 +59,8 @@ export type CapabilityWorkflow = {
 
 /**
  * Where a run leaves its machine-readable diagnostics. The producer advertises
- * the path rather than the adapter assuming one, so a build that does not
- * publish a report simply omits the section and nothing downstream changes.
+ * the path rather than the adapter assuming one. A missing report file
+ * produces absent metrics, rather than invented measurements.
  */
 export type CapabilityRunReport = {
   schema_version: number;
@@ -69,18 +69,13 @@ export type CapabilityRunReport = {
   stages: string[];
 };
 
-/**
- * Version 1 has no diagnostics section; version 2 added it. Both are accepted
- * because the difference is exactly what this adapter already treats as
- * optional: an older binary publishes no run report and the run response then
- * carries no metrics.
- */
-export type CapabilitiesSchemaVersion = 1 | 2;
-
 export type NeuriploCapabilities = {
-  schema_version: CapabilitiesSchemaVersion;
+  schema_version: 2;
+  diagnostics: {
+    run_report: CapabilityRunReport;
+  };
   producer: { name: "neuriplo-infer"; version: string };
-  diagnostics?: { run_report?: CapabilityRunReport };
+
   execution: { workflows: CapabilityWorkflow[] };
   source_types: Array<{ id: string; input: string }>;
   parameters: Record<string, CapabilityParameter>;
@@ -173,11 +168,29 @@ function assertCapabilities(
   if (!isRecord(value)) {
     throw invalidResponse("Capabilities response must be an object");
   }
-  if (value.schema_version !== 1 && value.schema_version !== 2) {
+  if (value.schema_version !== 2) {
     throw new CapabilitiesDiscoveryError(
       "unsupported_schema",
       `Unsupported capabilities schema version: ${String(value.schema_version)}`,
     );
+  }
+  const diagnostics = isRecord(value.diagnostics) ? value.diagnostics : null;
+  const report =
+    diagnostics && isRecord(diagnostics.run_report)
+      ? diagnostics.run_report
+      : null;
+  if (
+    !report ||
+    !Number.isInteger(report.schema_version) ||
+    (report.schema_version as number) < 1 ||
+    typeof report.path !== "string" ||
+    report.path.length === 0 ||
+    !isStringArray(report.stages) ||
+    report.stages.length === 0 ||
+    report.stages.some((stage) => stage.length === 0) ||
+    new Set(report.stages).size !== report.stages.length
+  ) {
+    throw invalidResponse("Capabilities run report diagnostics are invalid");
   }
   if (
     !isRecord(value.producer) ||
@@ -186,8 +199,7 @@ function assertCapabilities(
   ) {
     throw invalidResponse("Capabilities producer is invalid");
   }
-  // Diagnostics are optional: an older binary advertises none, and the run
-  // response then simply carries no metrics and no failure stage.
+  // Validate the advertised report before any run consumes it.
   if (value.diagnostics !== undefined) {
     if (!isRecord(value.diagnostics)) {
       throw invalidResponse("Capabilities diagnostics are invalid");

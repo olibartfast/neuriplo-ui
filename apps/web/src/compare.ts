@@ -148,7 +148,9 @@ export function compareRuns(runs: readonly RunResult[]): ComparisonRow[] {
  * The exact invocation a run was.
  *
  * The command is the authority, because it is the argument array the adapter
- * actually spawned: it carries the source, every parameter, and the model
+ * actually spawned. Source arguments are normalized to the original selection
+ * because each execution stages its inputs under a unique private path.
+ * The remaining arguments carry every parameter and the model
  * selector. Task and execution are included alongside it because a backend is
  * validated and echoed back rather than passed on the command line, so two
  * runs can share a command and still have run differently.
@@ -159,7 +161,13 @@ function invocationOf(run: RunResult): string {
     run.model,
     describeExecution(run.execution),
     run.command.bin,
-    run.command.args,
+    run.source.type,
+    run.source.paths,
+    run.command.args.map((arg) =>
+      arg.startsWith("--source=")
+        ? `--source=${run.source.paths.join(",")}`
+        : arg,
+    ),
   ]);
 }
 

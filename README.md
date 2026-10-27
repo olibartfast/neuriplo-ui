@@ -6,6 +6,9 @@ The UI discovers tasks, models, backends, workflows, sources, and advanced
 parameters from `neuriplo-infer --capabilities`; the frontend does not hard-code
 them.
 
+[Watch the three-minute demo on YouTube](https://youtu.be/PxTmKY71Jhc):
+backend selection, processed results, and client-server inference.
+
 ![The Neuriplo UI after an object-detection run.](docs/ui.png)
 
 ## Features
@@ -86,6 +89,9 @@ and size limits.
 npm run test:e2e
 ```
 
+With a real executable configured, `test:e2e` runs the provenance gate first.
+Without one, it runs fixture tests only and does not validate a real stack.
+
 By default, Playwright builds both apps and uses the fixture producer in
 `e2e/fixtures/producer/`, so no model or weights are required. Test a real binary
 with:
@@ -117,3 +123,26 @@ apps/server/  Local API adapter
 e2e/          Playwright tests and fixture producer
 specs/        Mission, stack, and design notes
 ```
+
+## Build provenance for validation
+
+Before real inference or browser validation, run:
+
+```bash
+export NEURIPLO_INFER_BIN=/path/to/build/app/neuriplo-infer
+npm run validate:stack
+```
+
+The gate also blocks a UI checkout missing commits from current remote master
+and records the UI commit and source hashes alongside the runtime evidence.
+
+The gate verifies clean release sources, independent infer/core/tasks versions,
+linked libraries and the executable against a recorded clean build. An existing
+binary without provenance is blocked. Configure released sources and record a
+fresh build with `npm run validate:stack -- --rebuild`; never attest an old binary.
+Re-run the gate after build, dependency, checkout or executable changes. The
+browser adapter must use the exact verified executable hash.
+
+Sources are staged as symlinks in each private run directory so source-relative
+outputs, including optical flow, remain discoverable. Input symlinks are excluded
+from artifact listings and downloads.

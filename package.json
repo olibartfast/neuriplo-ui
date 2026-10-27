@@ -22,7 +22,8 @@
     "test": "npm-run-all test:web test:server",
     "test:web": "npm --workspace @neuriplo-ui/web run test",
     "test:server": "npm --workspace @neuriplo-ui/server run test",
-    "test:e2e": "npm --workspace @neuriplo-ui/e2e run test"
+    "validate:stack": "python3 scripts/validate-stack.py",
+    "test:e2e": "python3 scripts/validate-stack.py --if-configured && npm --workspace @neuriplo-ui/e2e run test"
   },
   "engines": {
     "node": ">=22.12.0"

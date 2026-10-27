@@ -365,9 +365,7 @@ function valueFor(definition: CapabilityParameter | undefined): string {
     case "url":
       // The fixture KServe responder the harness starts. A real remote is the
       // operator's, through NEURIPLO_UI_E2E_ENDPOINT.
-      return (
-        process.env.NEURIPLO_UI_E2E_ENDPOINT?.trim() || "http://127.0.0.1:5175"
-      );
+      return remoteEndpoint();
     case "enum":
       return definition.values?.[0] ?? "";
     case "boolean":

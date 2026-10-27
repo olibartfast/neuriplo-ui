@@ -4,7 +4,14 @@ import type { NeuriploCapabilities } from "../src/capabilities.js";
 import { planRun, RunRequestError } from "../src/runs.js";
 
 const fixture: NeuriploCapabilities = {
-  schema_version: 1,
+  schema_version: 2,
+  diagnostics: {
+    run_report: {
+      schema_version: 1,
+      path: "data/output/run_report.json",
+      stages: ["inference"],
+    },
+  },
   producer: { name: "neuriplo-infer", version: "0.7.0" },
   execution: {
     workflows: [

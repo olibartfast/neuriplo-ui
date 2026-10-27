@@ -9,7 +9,14 @@ import { RunPanel, type RunState } from "../src/RunView.js";
 import type { RunResult } from "../src/run.js";
 
 const capabilities = {
-  schema_version: 1,
+  schema_version: 2,
+  diagnostics: {
+    run_report: {
+      schema_version: 1,
+      path: "data/output/run_report.json",
+      stages: ["inference"],
+    },
+  },
   producer: { name: "neuriplo-infer", version: "0.9.1" },
 } as unknown as NeuriploCapabilities;
 

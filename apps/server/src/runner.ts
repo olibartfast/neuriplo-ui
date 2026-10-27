@@ -1,15 +1,16 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 
 /**
  * Executes `neuriplo-infer` in a private working directory.
  *
  * The binary writes its rendered output relative to the current directory
  * (`data/output/...`), so giving every run its own directory is what makes the
- * generated artifacts both discoverable and safe to serve: anything inside the
+ * generated artifacts both discoverable and safe to serve. Staged source paths
+ * also keep source-relative writes in this private directory. Anything inside the
  * directory belongs to that run, and nothing outside it is reachable.
  */
 
@@ -90,6 +91,26 @@ export async function executeRun(
   const runId = randomUUID();
   const directory = join(runRootFor(options), runId);
   await mkdir(directory, { recursive: true });
+  const invocation = [...args];
+  const sourceIndex = invocation.findIndex((arg) =>
+    arg.startsWith("--source="),
+  );
+  if (sourceIndex >= 0) {
+    const sources = invocation[sourceIndex]
+      .slice("--source=".length)
+      .split(",");
+    const inputDirectory = join(directory, "inputs");
+    await mkdir(inputDirectory, { recursive: true });
+    const staged: string[] = [];
+    for (const [index, source] of sources.entries()) {
+      const stagedDirectory = join(inputDirectory, String(index));
+      await mkdir(stagedDirectory);
+      const path = join(stagedDirectory, basename(source));
+      await symlink(resolve(source), path);
+      staged.push(path);
+    }
+    invocation[sourceIndex] = `--source=${staged.join(",")}`;
+  }
 
   const stdout = collector(maxOutputBytes);
   const stderr = collector(maxOutputBytes);
@@ -100,7 +121,7 @@ export async function executeRun(
     signal: NodeJS.Signals | null;
     timedOut: boolean;
   }>((resolvePromise, rejectPromise) => {
-    const child = spawn(binaryPath, args, {
+    const child = spawn(binaryPath, invocation, {
       cwd: directory,
       // glog keeps INFO records in files under /tmp unless told otherwise;
       // routing everything to stderr is what lets the adapter return the log.
@@ -139,7 +160,7 @@ export async function executeRun(
   return {
     runId,
     directory,
-    args,
+    args: invocation,
     binaryPath,
     exitCode: outcome.exitCode,
     signal: outcome.signal,

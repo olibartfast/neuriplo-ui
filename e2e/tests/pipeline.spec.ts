@@ -40,6 +40,7 @@ test("renders a configurator driven by discovered capabilities", async ({
   await expect(page.getByTestId("source-path-0")).toBeVisible();
   await expect(page.getByTestId("run-status")).toHaveText("Idle");
   await expect(page.getByTestId("producer")).toContainText("neuriplo-infer");
+  await expect(page.getByTestId("producer")).not.toContainText(/schema/i);
 
   // Nothing has been supplied yet, so the run button must name what is
   // missing rather than launch an incomplete configuration.
