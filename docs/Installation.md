@@ -95,6 +95,12 @@ queries HTTP/HTTPS only: a `grpc://` endpoint can run inference while metadata
 inspection reports that it is unavailable. The UI does not guess a separate
 HTTP metadata port.
 
+### Headless inference
+
+For Docker or a machine without a desktop display, open Advanced controls and
+enable **No display** before running inference. This suppresses the native OpenCV
+window; the processed result remains available in the web preview and downloads.
+
 ### OpenCV DNN inputs
 
 OpenCV DNN requires explicit input sizes. For the tested YOLO26s ONNX model,
@@ -170,6 +176,16 @@ YOLO26. CI installs and starts ONNX Runtime with gRPC, OpenVINO and NERT CPU
 profiles; its startup checks are separate from the real-model browser checks.
 Results cover the listed models and execution paths, not every task/model pair.
 
-Automatic NVIDIA driver and Container Toolkit provisioning remain unvalidated
-on a fresh NVIDIA host; the GPU test host already had both installed. GPU tests
-used an RTX 3060 Laptop (6 GiB) with driver 610.43.02.
+Automatic Docker Engine and NVIDIA Container Toolkit provisioning was also tested
+in a fresh Ubuntu 24.04 userspace with an isolated Docker daemon. The shipped
+installer provisioned Docker Engine 29.9.2 and Toolkit 1.20.1, configured the NVIDIA
+runtime and restarted that isolated daemon. A nested GPU container then completed
+real YOLO26s inference with TensorRT 11.2.1.2 through Chrome 152, after a clean
+rebuild and provenance check in the GPU runtime. The result preview and download
+passed; host Docker configuration, daemon and pre-existing containers were unchanged.
+
+This test reused the host's working NVIDIA driver. Automatic driver installation,
+reboot and complete provisioning on a fresh physical NVIDIA host remain unvalidated.
+GPU tests used an RTX 3060 Laptop (6 GiB) with driver 610.43.02. The nested test
+used an AppArmor override for the laboratory environment; it does not validate
+all security configurations on a fresh host.
