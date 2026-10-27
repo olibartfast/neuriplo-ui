@@ -1,0 +1,26 @@
+FROM ubuntu:24.04
+ARG BACKEND=onnx_runtime
+ARG UI_COMMIT
+ARG BUILD_JOBS=4
+ARG ENABLE_GRPC=false
+ARG WITH_TESTS=false
+ARG STACK_RELEASES
+ARG NODE_VERSION
+ENV NEURIPLO_RELEASES=${STACK_RELEASES}
+ENV NEURIPLO_NODE_VERSION=${NODE_VERSION}
+ENV DEBIAN_FRONTEND=noninteractive
+ENV NEURIPLO_CONTAINER_BUILD=1
+COPY app /bootstrap/app
+RUN --mount=type=secret,id=github_token,required=false \
+    if [ -f /run/secrets/github_token ]; then export GH_TOKEN="$(cat /run/secrets/github_token)"; fi; \
+    flags=""; \
+    if [ "$ENABLE_GRPC" = true ]; then flags="$flags --grpc"; fi; \
+    if [ "$WITH_TESTS" = true ]; then flags="$flags --with-tests"; fi; \
+    bash /bootstrap/app/install.sh --style native --backend "$BACKEND" \
+      --prefix /opt/neuriplo-ui --data-dir /workspace --ui-commit "$UI_COMMIT" \
+      --source /bootstrap/app --jobs "$BUILD_JOBS" $flags && \
+    rm -rf /bootstrap
+USER ubuntu
+EXPOSE 5173
+ENTRYPOINT ["/opt/neuriplo-ui/bin/neuriplo-ui"]
+CMD ["--host", "0.0.0.0", "--data-dir", "/workspace"]

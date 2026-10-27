@@ -1,5 +1,6 @@
 import { createReadStream } from "node:fs";
 import { lstat } from "node:fs/promises";
+import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
 import {
   CapabilitiesDiscoveryError,
@@ -37,10 +38,15 @@ export type ServerOptions = {
   browse?: BrowseOptions;
   remote?: RemoteOptions;
   logger?: boolean;
+  webRoot?: string;
 };
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? true });
+  const webRoot = options.webRoot ?? process.env.NEURIPLO_UI_WEB_ROOT;
+  if (webRoot) {
+    app.register(fastifyStatic, { root: webRoot, dotfiles: "deny" });
+  }
   const loadCapabilities =
     options.loadCapabilities ?? (() => discoverCapabilities());
   const runner = options.runner ?? {};

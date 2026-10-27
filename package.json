@@ -7,6 +7,9 @@
     "e2e"
   ],
   "scripts": {
+    "install:native": "bash install.sh --style native",
+    "install:docker": "bash install.sh --style docker",
+    "test:installer": "python3 -m unittest discover -s scripts -p 'test_*.py'",
     "dev": "npm-run-all --parallel dev:web dev:server",
     "dev:web": "npm --workspace @neuriplo-ui/web run dev",
     "dev:server": "npm --workspace @neuriplo-ui/server run dev",

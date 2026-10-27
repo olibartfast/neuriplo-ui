@@ -38,7 +38,33 @@ Neuriplo is split across independently versioned repositories:
 The inference application pins its C++ dependencies; their version numbers do
 not need to match. The UI discovers the capabilities compiled into that application.
 
-## Quick start
+## Install the complete application
+
+On Ubuntu 24.04 x86_64, choose a native installation or Docker:
+
+```bash
+git clone https://github.com/olibartfast/neuriplo-ui.git
+cd neuriplo-ui
+
+# Native: install dependencies, build and start.
+./install.sh --style native --backend onnx_runtime --start
+
+# Or Docker: provision Docker if needed, build and start.
+./install.sh --style docker --backend onnx_runtime --start
+```
+
+Open **http://127.0.0.1:5173**. Each command installs the web app, its Node
+runtime, the released C++ components and the selected backend SDK. No separate
+manual installation of those dependencies is needed. Supply your own model
+weights and inputs in `~/Neuriplo`.
+
+Select `openvino`, `tensorrt`, `executorch`, `opencv_dnn` or `nert` with
+`--backend`. TensorRT requires NVIDIA hardware and a working host driver; the
+installer can provision a missing driver with `--install-driver` (then reboot).
+See the [installation guide](docs/Installation.md) for launchers, workspace
+selection, client-server configuration and platform/profile validation limits.
+
+## Developer quick start
 
 ```bash
 npm install

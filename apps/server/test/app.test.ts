@@ -528,3 +528,39 @@ test("GET /api/files lists the adapter's filesystem", async (context) => {
   });
   assert.equal(missing.statusCode, 404);
 });
+
+test("serves the installed web app alongside the API without exposing neighboring files", async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), "neuriplo-web-test-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const webRoot = join(directory, "dist");
+  await mkdir(webRoot);
+  await writeFile(
+    join(webRoot, "index.html"),
+    "<!doctype html><h1>Neuriplo</h1>",
+  );
+  await writeFile(join(webRoot, "app.js"), "console.log('ready');");
+  await writeFile(join(directory, "private.txt"), "private");
+  await writeFile(join(webRoot, ".env"), "private");
+  const app = buildServer({ webRoot, logger: false });
+  context.after(() => app.close());
+  const page = await app.inject({ method: "GET", url: "/" });
+  assert.equal(page.statusCode, 200);
+  assert.match(page.headers["content-type"] ?? "", /text\/html/);
+  assert.match(page.body, /Neuriplo/);
+  assert.equal(
+    (await app.inject({ method: "GET", url: "/api/health" })).statusCode,
+    200,
+  );
+  assert.equal(
+    (await app.inject({ method: "GET", url: "/app.js" })).statusCode,
+    200,
+  );
+  assert.equal(
+    (await app.inject({ method: "GET", url: "/%2e%2e/private.txt" }))
+      .statusCode,
+    404,
+  );
+  const dotfile = await app.inject({ method: "GET", url: "/.env" });
+  assert.notEqual(dotfile.statusCode, 200);
+  assert.doesNotMatch(dotfile.body, /^private$/);
+});

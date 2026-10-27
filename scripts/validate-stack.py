@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 import subprocess
 import sys
+import urllib.request
 
 
 def run(*args):
@@ -54,6 +55,17 @@ def verify_ui_revision(includes_current_master):
         raise ValueError('UI checkout is behind current origin/master; fetch and integrate it before browser validation')
 
 
+
+def latest_release(name):
+    headers = {'User-Agent': 'neuriplo-ui-stack-validation'}
+    if os.environ.get('GH_TOKEN'):
+        headers['Authorization'] = 'Bearer ' + os.environ['GH_TOKEN']
+    request = urllib.request.Request(
+        f'https://api.github.com/repos/olibartfast/{name}/releases/latest', headers=headers)
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return json.load(response)['tag_name']
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path)
@@ -77,8 +89,7 @@ def main():
         source = Path(values[f'{name}_SOURCE_DIR']).resolve()
         if run('git', '-C', str(source), 'status', '--porcelain', '--untracked-files=no'):
             raise ValueError(f'{name}: tracked source changes; use a clean release checkout')
-        release = json.loads(run('gh', 'release', 'view', '--repo', f'olibartfast/{name}',
-                                 '--json', 'tagName'))['tagName']
+        release = latest_release(name)
         head = run('git', '-C', str(source), 'rev-parse', 'HEAD')
         tag = run('git', '-C', str(source), 'rev-parse', f'{release}^{{commit}}')
         if head != tag:
@@ -146,7 +157,10 @@ def main():
         if core is None:
             raise ValueError('Cannot identify linked OpenVINO runtime')
         prefix = core.resolve().parent.parent
-        library = ctypes.CDLL(str(prefix / 'libs/libopenvino_c.so.2630'))
+        c_library = next((prefix / 'libs').glob('libopenvino_c.so.*'), None)
+        if c_library is None:
+            raise ValueError('Cannot identify installed OpenVINO C runtime')
+        library = ctypes.CDLL(str(c_library))
         class OvVersion(ctypes.Structure):
             _fields_ = [('buildNumber', ctypes.c_char_p), ('description', ctypes.c_char_p)]
         version = OvVersion()
