@@ -9,7 +9,8 @@ import re
 from pathlib import Path
 import subprocess
 import sys
-import urllib.request
+
+from github_release import latest_release
 
 
 def run(*args):
@@ -56,23 +57,16 @@ def verify_ui_revision(includes_current_master):
 
 
 
-def latest_release(name):
-    headers = {'User-Agent': 'neuriplo-ui-stack-validation'}
-    if os.environ.get('GH_TOKEN'):
-        headers['Authorization'] = 'Bearer ' + os.environ['GH_TOKEN']
-    request = urllib.request.Request(
-        f'https://api.github.com/repos/olibartfast/{name}/releases/latest', headers=headers)
-    with urllib.request.urlopen(request, timeout=60) as response:
-        return json.load(response)['tag_name']
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path)
     parser.add_argument('--rebuild', action='store_true')
+    parser.add_argument('--jobs', type=int, default=4, help='Parallel jobs for a clean rebuild')
     parser.add_argument('--if-configured', action='store_true',
                         help='Allow fixture-only E2E when no real executable is configured')
     args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error('jobs must be positive')
     if args.if_configured and not os.environ.get('NEURIPLO_INFER_BIN', '').strip():
         print('Fixture-only E2E: real stack provenance is not validated')
         return
@@ -125,7 +119,7 @@ def main():
     manifest = build / 'neuriplo-ui-provenance.json'
     if args.rebuild:
         manifest.unlink(missing_ok=True)
-        subprocess.run(['cmake', '--build', str(build), '--clean-first', '--parallel', '4'],
+        subprocess.run(['cmake', '--build', str(build), '--clean-first', '--parallel', str(args.jobs)],
                        check=True)
     capabilities = json.loads(run(str(binary), '--capabilities'))
     if capabilities['producer']['version'] != versions['neuriplo-infer']:

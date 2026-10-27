@@ -76,16 +76,22 @@ Goal: make the configurator capability-driven.
 - [x] Make model choices depend on the selected task.
 - [x] Let the user choose local or client-server execution when both are available.
 - [ ] Make local backend choices depend on model compatibility/availability.
+- [ ] Advertise and validate backend-specific requirements before launching
+  (for example, mandatory OpenCV DNN input sizes).
 - [x] Show endpoint, remote model/version, and transport controls only for client-server execution.
 - [x] Add file/image/video source selection.
 - [x] Add task-specific advanced controls only when relevant.
 - [x] Add weights/model-path handling.
 - [x] Display validation before launching invalid configurations.
 
-One item remains open, and it needs contract support rather than UI work:
+These two items need producer contract support before the UI can enforce them:
 backend choices currently follow the execution workflow, because the contract
 advertises backends per workflow and not per model; per-model backend
-compatibility has to be advertised before the UI can narrow the list.
+compatibility has to be advertised before the UI can narrow the list. The same
+boundary applies to mandatory backend parameters: OpenCV DNN requires explicit
+input sizes, but the shared parameter catalog currently advertises them as
+optional. Keep this requirement in the installation guide until the producer
+can declare it conditionally; do not add a second backend registry in the UI.
 
 Source selection now covers both the type and the paths, with one input slot per
 source the task advertises (`min_items`/`max_items`, `-1` meaning unbounded).
@@ -268,7 +274,7 @@ Implementation contract: [Phase 7 — Packaging and CI integration](phase-7-pack
 - [x] Add frontend/unit tests where useful.
 - [x] Add GitHub Actions for build and Playwright smoke tests.
 - [x] Define a Docker/dev-container workflow if it materially simplifies E2E setup.
-- [x] Decide whether release packaging belongs here or in `neuriplo-platform`.
+- [x] Provide native and Docker installers for the complete local application.
 
 The gate this phase actually needed was the one nobody had noticed was missing.
 Playwright runs TypeScript through esbuild and `node --import tsx` strips types
@@ -284,11 +290,14 @@ element. Two rules are configured off, each with its reason — and where the
 reason was that the rule cannot see through a component boundary, a browser
 test now asserts the property it could not see.
 
-Both conditional items are answered in the contract. The dev container earns
-its file by removing the one setup step that needs root, and nothing else;
-release packaging belongs in `neuriplo-platform`, because this repository
-produces nothing anyone installs and its adapter exists to expose a developer's
-own machine to a browser on the same machine.
+The dev container supports development and fixture tests. The application also
+ships native and Docker installers for Ubuntu 24.04 x86_64. Both provision the
+web app, independently released C++ components and one selected backend SDK;
+the adapter serves the production frontend and API together. Installation
+commands and the validation limits are maintained in
+[the installation guide](../docs/Installation.md). NVIDIA driver and Container
+Toolkit provisioning still need a fresh NVIDIA host validation. `neuriplo-platform` continues
+to own ecosystem-wide compatibility and architecture documentation.
 
 One finding from earlier phases is also closed here. `npm run dev` still served
 on `0.0.0.0` while proxying to that adapter, which is the Phase 5 preview

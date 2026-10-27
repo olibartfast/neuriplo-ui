@@ -1,5 +1,10 @@
 # Phase 7 — Packaging and CI integration
 
+**Status: implemented.** Type checking, lint, unit/browser tests and complete
+application installers are present. The sections below retain the original
+validation rationale; F2 describes the current installation responsibility.
+Profile-specific validation limits live in [Installation](../docs/Installation.md).
+
 ## Outcome
 
 Phases 1–6 built the thing. Phase 7 is about keeping it built: the gates that
@@ -19,7 +24,7 @@ Phase 7 is complete when:
 - the Docker/dev-container and release-packaging questions are answered with a
   reason, not left open.
 
-## The hole this phase actually closes
+## Original validation gap
 
 The E2E harness is the thing that proves everything else works, and it is the
 only code in the repository that nothing checks. Playwright runs TypeScript
@@ -144,33 +149,43 @@ Two things the image does not give for free, and the file has to say so:
   measured 7.3 GB. A container whose entire purpose is browser reliability
   cannot leave that to chance.
 
-The honest limit is recorded next to it: this simplifies the *fixture* path
-only. A `neuriplo-infer` built with backends, its weights, and
-`neuriplo-kserve-runtime` are built in other repositories, and nothing here can
-put them in an image.
+The development container covers fixture tests. It is separate from the
+application installers below, which build the released inference stack and a
+selected runtime as well.
 
-### F2. Release packaging — `neuriplo-platform`, not here
+### F2. Complete application installation
 
-This repository produces nothing anyone installs. Both packages are private and
-unpublished; the adapter spawns a local binary, browses the local filesystem,
-and is deliberately bound to loopback; and the frontend is a dev and test
-client for it. There is not even a single artifact to ship — the adapter serves
-no static files, so a built UI still needs something else to serve it.
+This repository ships `install.sh` with native and Docker installation styles.
+Both use `scripts/install.py` to provision system prerequisites, a private Node
+runtime, locked npm dependencies, independent current infer/core/tasks releases
+and the chosen backend SDK. SDK versions follow the released core's metadata.
 
-Packaging the Neuriplo *platform* — the binary, the runtime, the models — is
-`neuriplo-platform`'s concern, and the UI would be packaged there as one part
-of it if it is ever packaged at all. Deciding otherwise here would mean this
-repository shipping a server whose entire purpose is to expose a developer's
-own machine.
+The native installer configures a fresh build and records provenance through
+the stack gate's clean-rebuild operation before writing a successful installation
+marker. Its launcher verifies the executable hash, serves the built frontend
+and API in one process and stops the process group on exit.
 
-What this repository does own is the reproducible way to *run* it, which is
-Slice F1's container and the documented commands.
+Docker runs the same native installer in Ubuntu 24.04. Its generated launcher
+uses the host UID/GID, mounts a separate data workspace and publishes the web
+port on loopback. Build contexts exclude Git metadata and ignored data. Optional
+GitHub credentials are passed as build secrets.
+
+CI builds and starts installed CPU profiles in addition to the development
+checks and fixture browser suite. A capability/startup check does not prove real
+model inference. The supported platform, exact validation scope, NVIDIA setup
+and launch commands are documented in
+[Installation](../docs/Installation.md).
+
+Model assets and a remote serving deployment are supplied separately. The
+installer enables the KServe HTTP client; `--grpc` provisions its additional
+build dependencies. Ecosystem architecture and compatibility sets remain in
+`neuriplo-platform`.
 
 ## What this phase does not do
 
 - No coverage threshold. A percentage target rewards testing what is easy to
   reach, and this repository's untested surface is untested for stated reasons.
-- No release automation, tags, or published packages, unless F2 concludes that
-  packaging belongs here.
+- No automated release tags, npm publication or prebuilt application images.
+  The installers build the application and selected runtime from released sources.
 - No commit hooks. CI is the gate; a hook is a convenience, and one that
   silently rewrites a developer's commit is not obviously one.

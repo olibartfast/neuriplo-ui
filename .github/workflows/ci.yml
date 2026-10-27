@@ -68,6 +68,16 @@ jobs:
   installer-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: onnx_runtime
+            grpc: true
+          - backend: openvino
+            grpc: false
+          - backend: nert
+            grpc: false
     permissions:
       contents: read
     steps:
@@ -75,11 +85,18 @@ jobs:
       - name: Install the complete CPU Docker profile
         env:
           GH_TOKEN: ${{ github.token }}
+          INSTALL_BACKEND: ${{ matrix.backend }}
+          ENABLE_GRPC: ${{ matrix.grpc }}
         run: |
-          bash install.sh --style docker --backend onnx_runtime \
+          options=()
+          if [ "$ENABLE_GRPC" = true ]; then options+=(--grpc); fi
+          bash install.sh --style docker --backend "$INSTALL_BACKEND" "${options[@]}" \
             --prefix "$RUNNER_TEMP/neuriplo-installed" \
-            --data-dir "$RUNNER_TEMP/neuriplo-workspace" --port 5373
+            --data-dir "$RUNNER_TEMP/neuriplo-workspace" --port 5373 --jobs 2
       - name: Start and inspect the installed application
+        env:
+          INSTALL_BACKEND: ${{ matrix.backend }}
+          ENABLE_GRPC: ${{ matrix.grpc }}
         run: |
           "$RUNNER_TEMP/neuriplo-installed/neuriplo-ui-docker" > "$RUNNER_TEMP/installed-ui.log" 2>&1 &
           launcher_pid=$!
@@ -91,15 +108,19 @@ jobs:
           curl --fail --silent http://127.0.0.1:5373/ | grep -q '<div id="root">'
           curl --fail --silent http://127.0.0.1:5373/api/capabilities > "$RUNNER_TEMP/installed-capabilities.json"
           python3 - "$RUNNER_TEMP/installed-capabilities.json" <<'PY'
-          import json, sys
+          import json, os, sys
           caps = json.load(open(sys.argv[1]))
           assert caps['schema_version'] == 2
-          assert 'onnx_runtime' in next(w for w in caps['execution']['workflows'] if w['id'] == 'local')['backends']
+          assert os.environ['INSTALL_BACKEND'] in next(w for w in caps['execution']['workflows'] if w['id'] == 'local')['backends']
+          remote = next(w for w in caps['execution']['workflows'] if w['id'] == 'client_server')
+          transports = next(p for p in remote['protocols'] if p['id'] == 'kserve_v2')['transports']
+          assert 'http' in transports
+          assert ('grpc' in transports) == (os.environ['ENABLE_GRPC'] == 'true')
           PY
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: installer-diagnostics
+          name: installer-diagnostics-${{ matrix.backend }}
           path: |
             ${{ runner.temp }}/installed-ui.log
             ${{ runner.temp }}/installed-capabilities.json

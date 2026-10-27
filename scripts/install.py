@@ -21,6 +21,8 @@ import time
 import urllib.request
 import zipfile
 
+from github_release import latest_release as release
+
 ROOT = Path(__file__).resolve().parents[1]
 REPO = 'https://github.com/olibartfast/neuriplo-ui.git'
 BACKENDS = ('onnx_runtime', 'openvino', 'tensorrt', 'executorch', 'opencv_dnn', 'nert')
@@ -48,10 +50,6 @@ def fetch_json(url):
         return json.load(response)
 
 
-def release(name):
-    return fetch_json(f'https://api.github.com/repos/olibartfast/{name}/releases/latest')['tag_name']
-
-
 def sha(path):
     with Path(path).open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
@@ -64,9 +62,17 @@ def download(url, path, expected=None):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + '.partial')
     for attempt in range(3):
+        print(f'Downloading {path.name} (attempt {attempt + 1}/3)', flush=True)
         try:
             with urllib.request.urlopen(request(url), timeout=60) as source, temporary.open('wb') as target:
-                shutil.copyfileobj(source, target)
+                received = 0
+                last_progress = time.monotonic()
+                while chunk := source.read(1024 * 1024):
+                    target.write(chunk)
+                    received += len(chunk)
+                    if time.monotonic() - last_progress >= 15:
+                        print(f'  {path.name}: {received / 1024**2:.0f} MiB downloaded', flush=True)
+                        last_progress = time.monotonic()
             if expected and sha(temporary) != expected:
                 raise ValueError(f'Checksum mismatch: {path.name}')
             temporary.replace(path)
@@ -173,7 +179,7 @@ def copy_overlay(source, destination):
     else:
         manifest = source / 'installer-files.json'
         names = json.loads(manifest.read_text())
-    names += ['install.sh', 'scripts/install.py', 'scripts/launch.py', 'docker/Dockerfile.ui']
+    names += ['install.sh', 'scripts/install.py', 'scripts/launch.py', 'scripts/github_release.py', 'docker/Dockerfile.ui']
     copied = []
     for name in dict.fromkeys(names):
         if not name:
@@ -247,6 +253,18 @@ def ensure_container_gpu(args, engine):
     command(privileged(['systemctl', 'restart', 'docker']))
 
 
+def executorch_submodules(source):
+    entries = command(['git', '-C', source, 'config', '--file', '.gitmodules',
+                       '--get-regexp', r'^submodule\..*\.path$'], capture=True)
+    paths = [line.split(None, 1)[1] for line in entries.splitlines()]
+    # This profile builds portable kernels and XNNPACK, not optimized Eigen,
+    # ARM/Vulkan delegates or LLM extensions. Keep the release's gitlink pins.
+    selected = [path for path in paths if path.startswith(('backends/xnnpack/', 'third-party/')) or path == 'shim']
+    if not selected:
+        raise ValueError('Cannot identify the released ExecuTorch build submodules')
+    return selected
+
+
 def install_sdk(backend, prefix, sources, versions, environment, jobs):
     sdk = prefix / 'sdk'
     sdk.mkdir(exist_ok=True)
@@ -312,19 +330,29 @@ def install_sdk(backend, prefix, sources, versions, environment, jobs):
         src = sdk / 'source/executorch'
         command(['git', 'clone', '--depth', '1', '--branch', version,
                  'https://github.com/pytorch/executorch.git', src])
-        command(['git', '-C', src, 'submodule', 'update', '--init', '--recursive', '--depth', '1'])
+        command(['git', '-C', src, 'submodule', 'update', '--init', '--recursive', '--depth', '1',
+                 '--jobs', jobs, '--', *executorch_submodules(src)])
         venv = sdk / 'executorch-python'
         command([sys.executable, '-m', 'venv', venv])
         build_env = environment | {'PATH': f'{venv}/bin:{environment["PATH"]}', 'VIRTUAL_ENV': str(venv)}
         command([venv / 'bin/pip', 'install', 'tomli', 'zstd', 'setuptools', 'wheel'])
-        command(['bash', src / 'install_requirements.sh'], cwd=src, env=build_env)
+        # The upstream full setup also installs unrelated LLM/quantization
+        # packages. The C++ profile needs code generation and the pinned torchgen.
+        requirements = (src / 'install_requirements.py').read_text()
+        torch_version = re.search(r'torch==([0-9]+\.[0-9]+\.[0-9]+)', requirements)
+        if not torch_version:
+            raise ValueError('ExecuTorch release does not declare its Torch build version')
+        command([venv / 'bin/pip', 'install', '--index-url', 'https://download.pytorch.org/whl/cpu',
+                 f'torch=={torch_version.group(1)}'], env=build_env)
+        command([venv / 'bin/pip', 'install', '-r', src / 'requirements-dev.txt'], env=build_env)
         build = src / 'cmake-out'
         installed = sdk / 'executorch'
         command(['cmake', '-S', src, '-B', build, '-GNinja', '-DCMAKE_BUILD_TYPE=Release',
                  f'-DCMAKE_INSTALL_PREFIX={installed}', '-DCMAKE_CXX_STANDARD=17',
                  '-DEXECUTORCH_BUILD_EXTENSION_MODULE=ON', '-DEXECUTORCH_BUILD_EXTENSION_NAMED_DATA_MAP=ON',
                  '-DEXECUTORCH_BUILD_EXTENSION_TENSOR=ON', '-DEXECUTORCH_BUILD_EXTENSION_DATA_LOADER=ON',
-                 '-DEXECUTORCH_BUILD_XNNPACK=ON', '-DEXECUTORCH_BUILD_TESTS=OFF',
+                 '-DEXECUTORCH_BUILD_XNNPACK=ON', '-DEXECUTORCH_BUILD_KERNELS_OPTIMIZED=OFF',
+                 '-DEXECUTORCH_BUILD_TESTS=OFF', '-DEXECUTORCH_BUILD_EXAMPLES=OFF',
                  f'-DPYTHON_EXECUTABLE={venv}/bin/python'], env=build_env)
         command(['cmake', '--build', build, '--parallel', jobs], env=build_env)
         command(['cmake', '--install', build], env=build_env)
@@ -398,7 +426,7 @@ def native(args):
     if args.remote_allow:
         environment['NEURIPLO_UI_REMOTE_ALLOW'] = args.remote_allow
     environment['NEURIPLO_INFER_BIN'] = str(build / 'app/neuriplo-infer')
-    record_command([sys.executable, app / 'scripts/validate-stack.py', '--rebuild'],
+    record_command([sys.executable, app / 'scripts/validate-stack.py', '--rebuild', '--jobs', str(args.jobs)],
                    prefix / 'build-validation.log', cwd=app, env=environment)
     command([sys.executable, app / 'scripts/validate-stack.py'], cwd=app, env=environment, capture=True)
     if args.with_tests:
@@ -426,6 +454,14 @@ def docker_command():
         if shutil.which(candidate[0]) and subprocess.run([*candidate, 'info'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
             return candidate
     raise ValueError('Docker daemon is unavailable. Start Docker, then rerun the installer.')
+
+
+def docker_build_engine(engine):
+    # sudo normally removes GH_TOKEN. Preserve only this optional build-secret
+    # variable, without putting its value into arguments or generated launchers.
+    if os.environ.get('GH_TOKEN') and engine[0] == 'sudo':
+        return [*engine[:-1], '--preserve-env=GH_TOKEN', engine[-1]]
+    return engine
 
 
 def install_docker_engine():
@@ -468,7 +504,7 @@ def docker(args):
         lock = json.dumps({'releases': refs, 'node': node, 'grpc': args.grpc, 'with_tests': args.with_tests}, sort_keys=True)
         identifier = hashlib.sha256(lock.encode()).hexdigest()[:12]
         image = f'neuriplo-ui:{args.backend}-{commit[:12]}-{identifier}'
-        command([*engine, 'build', '--build-arg', f'BACKEND={args.backend}', '--build-arg', f'UI_COMMIT={commit}',
+        command([*docker_build_engine(engine), 'build', '--build-arg', f'BACKEND={args.backend}', '--build-arg', f'UI_COMMIT={commit}',
                  '--build-arg', f'BUILD_JOBS={args.jobs}', '--build-arg', f'ENABLE_GRPC={str(args.grpc).lower()}',
                  '--build-arg', f'WITH_TESTS={str(args.with_tests).lower()}', '--build-arg', f'STACK_RELEASES={json.dumps(refs, sort_keys=True)}',
                  '--build-arg', f'NODE_VERSION={node}',

@@ -40,17 +40,22 @@ not need to match. The UI discovers the capabilities compiled into that applicat
 
 ## Install the complete application
 
-On Ubuntu 24.04 x86_64, choose a native installation or Docker:
+On Ubuntu 24.04 x86_64, [download the installer](https://raw.githubusercontent.com/olibartfast/neuriplo-ui/master/install.sh)
+in your browser, or use:
 
 ```bash
-git clone https://github.com/olibartfast/neuriplo-ui.git
-cd neuriplo-ui
+curl -fsSL https://raw.githubusercontent.com/olibartfast/neuriplo-ui/master/install.sh -o install.sh
+```
 
+Choose a native installation or Docker; no existing checkout, Git or Node setup
+is required:
+
+```bash
 # Native: install dependencies, build and start.
-./install.sh --style native --backend onnx_runtime --start
+bash install.sh --style native --backend onnx_runtime --start
 
 # Or Docker: provision Docker if needed, build and start.
-./install.sh --style docker --backend onnx_runtime --start
+bash install.sh --style docker --backend onnx_runtime --start
 ```
 
 Open **http://127.0.0.1:5173**. Each command installs the web app, its Node
@@ -132,6 +137,15 @@ and size limits.
 
 ```bash
 npm run test:e2e
+```
+
+The suite starts its own adapter, web app and fixture remote. It refuses to
+reuse an existing service, which could be configured with a different runtime.
+If the default ports are in use, select free ports, for example:
+
+```bash
+NEURIPLO_UI_WEB_PORT=5480 NEURIPLO_UI_API_PORT=5481 \
+  NEURIPLO_UI_REMOTE_PORT=5482 npm run test:e2e
 ```
 
 With a real executable configured, `test:e2e` runs the provenance gate first.

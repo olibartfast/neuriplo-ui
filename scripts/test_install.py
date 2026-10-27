@@ -105,6 +105,26 @@ class InstallerTests(unittest.TestCase):
                 installer.ensure_container_gpu(args, ['docker'])
             apt.assert_not_called()
 
+    def test_sudo_build_preserves_optional_secret_without_argument_value(self):
+        with patch.dict(os.environ, {'GH_TOKEN': 'example-secret'}):
+            command = installer.docker_build_engine(['sudo', 'docker'])
+            self.assertEqual(command, ['sudo', '--preserve-env=GH_TOKEN', 'docker'])
+            self.assertNotIn('example-secret', ' '.join(command))
+            self.assertEqual(installer.docker_build_engine(['docker']), ['docker'])
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(installer.docker_build_engine(['sudo', 'docker']), ['sudo', 'docker'])
+
+    def test_executorch_xnnpack_avoids_unrelated_delegate_submodules(self):
+        entries = '\n'.join('submodule.' + p + '.path ' + p for p in [
+            'backends/xnnpack/third-party/XNNPACK', 'third-party/flatbuffers',
+            'third-party/prelude', 'shim', 'kernels/optimized/third-party/eigen',
+            'backends/arm/third-party/ethos-u-core-driver',
+            'backends/vulkan/third-party/Vulkan-Headers', 'extension/llm/tokenizers'])
+        with patch.object(installer, 'command', return_value=entries):
+            selected = installer.executorch_submodules(Path('/source'))
+        self.assertEqual(selected, ['backends/xnnpack/third-party/XNNPACK',
+                                  'third-party/flatbuffers', 'third-party/prelude', 'shim'])
+
     def test_tensor_rt_11_archive_uses_cuda_build_line(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

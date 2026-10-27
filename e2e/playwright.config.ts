@@ -122,9 +122,9 @@ export default defineConfig({
         HOST: "127.0.0.1",
         PORT: String(apiPort),
       },
-      // An operator with `npm run dev` already running keeps that adapter,
-      // along with whichever producer they configured for it.
-      reuseExistingServer: !process.env.CI,
+      // Reusing an existing adapter can select a different executable from
+      // the one validated by the stack gate. Use dedicated ports instead.
+      reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 180_000,
@@ -133,7 +133,7 @@ export default defineConfig({
       command: remoteCommand,
       cwd: repository,
       url: `${remoteUrl}/v2`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 30_000,
@@ -151,7 +151,7 @@ export default defineConfig({
       cwd: repository,
       url: `http://127.0.0.1:${webPort}`,
       env: { NEURIPLO_UI_API: apiUrl },
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       stdout: "pipe",
       stderr: "pipe",
       timeout: 180_000,

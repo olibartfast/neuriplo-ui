@@ -7,10 +7,15 @@ procedure. Run it as your normal user; system packages request `sudo` as needed.
 Automatic provisioning targets Ubuntu 24.04 on x86_64. Internet access is needed
 for installation. Model weights and input data are supplied separately.
 
+Use `install.sh` from a repository checkout or
+[download it](https://raw.githubusercontent.com/olibartfast/neuriplo-ui/master/install.sh)
+and run it with Bash. The standalone script bootstraps its own checkout and
+missing Git/Python prerequisites; you do not need to prepare Node or SDKs.
+
 ## Native
 
 ```bash
-./install.sh --style native --backend onnx_runtime --start
+bash install.sh --style native --backend onnx_runtime --start
 ```
 
 This installs build tools and system libraries, a private Node 22 LTS runtime,
@@ -32,7 +37,7 @@ No Node setup, environment exports or Vite development server are needed.
 ## Docker
 
 ```bash
-./install.sh --style docker --backend onnx_runtime --start
+bash install.sh --style docker --backend onnx_runtime --start
 ```
 
 If Docker Engine is missing, the installer sets up Docker's official Ubuntu
@@ -83,9 +88,27 @@ include `host.docker.internal` for accessing a server on the host. Select the
 client-server workflow and enter the endpoint in the UI; deploying the model
 server is a separate operation.
 
+HTTP and gRPC inference have been exercised against a real KServe-compatible
+server with YOLO26. For gRPC, install with `--grpc`, select the gRPC transport
+and supply that server's gRPC endpoint and port. The metadata panel currently
+queries HTTP/HTTPS only: a `grpc://` endpoint can run inference while metadata
+inspection reports that it is unavailable. The UI does not guess a separate
+HTTP metadata port.
+
+### OpenCV DNN inputs
+
+OpenCV DNN requires explicit input sizes. For the tested YOLO26s ONNX model,
+open Advanced controls and set **Input sizes** to `3,640,640`; batch size remains
+`1`. Use the dimensions required by your own model. The current capability
+contract does not mark this parameter as required specifically for OpenCV, so
+omitting it currently produces a model-setup error after launch.
+
+OpenCV 5's default DNN engine is CPU-only in the released integration; keep
+**Use GPU** disabled for this profile. TensorRT is the validated NVIDIA profile.
+
 ### NVIDIA setup
 
-A working host driver is needed for TensorRT. If none is present, the installer
+A host driver compatible with the selected CUDA/TensorRT release is needed for TensorRT. If none is present, the installer
 can install it with `--install-driver`; reboot and rerun the same command after
 the driver installation. An existing working driver is left in place.
 
@@ -98,18 +121,23 @@ are running, the installer stops before changing the daemon; pass
 
 ```bash
 # Inspect the plan without installing anything.
-./install.sh --style docker --backend openvino --dry-run
+bash install.sh --style docker --backend openvino --dry-run
 
 # Keep models and inputs in a chosen workspace, and use a different web port.
-./install.sh --style native --backend openvino \
+bash install.sh --style native --backend openvino \
   --data-dir "$HOME/vision-data" --port 5180 --start
 
 # Install into a chosen prefix and include browser-test dependencies.
-./install.sh --style native --backend onnx_runtime \
+bash install.sh --style native --backend onnx_runtime \
   --prefix "$HOME/neuriplo-local" --with-tests
 ```
 
-`--jobs` limits native compilation parallelism (default: at most four jobs).
+OpenCV DNN and ExecuTorch compile their SDKs from source and can take
+substantially longer than installing a binary SDK. TensorRT also downloads the
+CUDA toolkit and a multi-gigabyte SDK archive.
+
+`--jobs` limits SDK and inference application compilation parallelism
+(default: at most four jobs).
 The Node runtime and SDKs live in the chosen prefix. System packages are installed
 through apt. The installer refuses to overwrite an unrelated, nonempty prefix.
 A completed native installation can be reused after its runtime and provenance
@@ -124,13 +152,24 @@ Docker's published port is selected at installation time.
 
 ## Validation scope
 
-Fresh Ubuntu 24.04 installations were tested with ONNX Runtime CPU in Docker
-and OpenVINO CPU using the native installer. Both completed real YOLO26 inference
-through Chrome, including input selection, a fully visible result preview and
-artifact download, after passing the build-provenance gate. CI also builds and
-starts the complete ONNX Runtime Docker profile.
+The following fresh Ubuntu 24.04 installations completed real inference through
+Chrome after passing the clean-build provenance gate. Checks included input
+selection, a fully visible result preview and artifact download.
 
-TensorRT, ExecuTorch, OpenCV DNN and NERT provisioning are available but have not
-yet passed the same fresh-install validation. NVIDIA driver installation and
-host Docker/Container Toolkit provisioning also require validation on a fresh
-host; the tested Docker host already had Docker installed.
+| Backend | SDK/runtime | Installation tested | Model |
+| --- | --- | --- | --- |
+| ONNX Runtime CPU | 1.28.0 | Docker, including automatic Docker Engine installation in a fresh VM | YOLO26s |
+| OpenVINO CPU | 2026.3.0 | Native | YOLO26s |
+| TensorRT | 11.2.1.2 | Docker on an existing NVIDIA host; fresh engine built with the installed SDK | YOLO26s |
+| NERT CPU (experimental) | 0.2.0 | Docker | YOLO26s |
+| ExecuTorch CPU / XNNPACK | 1.2.0 | Docker | YOLOv8n |
+| OpenCV DNN CPU | 5.0.0, native DNN engine | Docker | YOLO26s, input sizes `3,640,640` |
+
+Client-server HTTP and gRPC runs also completed against a real server with
+YOLO26. CI installs and starts ONNX Runtime with gRPC, OpenVINO and NERT CPU
+profiles; its startup checks are separate from the real-model browser checks.
+Results cover the listed models and execution paths, not every task/model pair.
+
+Automatic NVIDIA driver and Container Toolkit provisioning remain unvalidated
+on a fresh NVIDIA host; the GPU test host already had both installed. GPU tests
+used an RTX 3060 Laptop (6 GiB) with driver 610.43.02.
