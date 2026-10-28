@@ -26,6 +26,26 @@ def runtime_environment(state, host, port, workspace):
     }
 
 
+def wait_ready(child, url, backend, timeout=120):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if child.poll() is not None:
+            raise RuntimeError(f'The web application exited with status {child.returncode}')
+        try:
+            # The adapter allows up to ten seconds for producer discovery.
+            # TensorFlow library loading can exceed a one-second HTTP probe.
+            remaining = max(.1, deadline - time.monotonic())
+            with urllib.request.urlopen(url, timeout=min(15, remaining)) as response:
+                capabilities = json.load(response)
+            backends = [b for w in capabilities['execution']['workflows'] for b in w['backends']]
+            if backend not in backends:
+                raise ValueError('The runtime does not advertise the selected backend')
+            return
+        except OSError:
+            time.sleep(.2)
+    raise RuntimeError('The web application did not become ready')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--host', default='127.0.0.1')
@@ -59,21 +79,8 @@ def main():
     signal.signal(signal.SIGINT, stop)
     try:
         probe_host = '127.0.0.1' if args.host == '0.0.0.0' else args.host
-        for _ in range(100):
-            if child.poll() is not None:
-                raise RuntimeError(f'The web application exited with status {child.returncode}')
-            try:
-                with urllib.request.urlopen(f'http://{probe_host}:{args.port}/api/capabilities', timeout=1) as response:
-                    capabilities = json.load(response)
-                backends = [b for w in capabilities['execution']['workflows'] for b in w['backends']]
-                if state['backend'] not in backends:
-                    raise ValueError('The runtime does not advertise the selected backend')
-                print(f'Neuriplo UI: http://{probe_host}:{args.port}\nWorkspace: {workspace}', flush=True)
-                break
-            except OSError:
-                time.sleep(.2)
-        else:
-            raise RuntimeError('The web application did not become ready')
+        wait_ready(child, f'http://{probe_host}:{args.port}/api/capabilities', state['backend'])
+        print(f'Neuriplo UI: http://{probe_host}:{args.port}\nWorkspace: {workspace}', flush=True)
         code = child.wait()
         return 0 if stopping else code
     finally:

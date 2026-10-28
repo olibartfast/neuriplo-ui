@@ -22,10 +22,11 @@ import urllib.request
 import zipfile
 
 from github_release import latest_release as release
+from sdk_provenance import libtorch_sdk, litert_sdk
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO = 'https://github.com/olibartfast/neuriplo-ui.git'
-BACKENDS = ('onnx_runtime', 'openvino', 'tensorrt', 'executorch', 'opencv_dnn', 'nert')
+BACKENDS = ('onnx_runtime', 'openvino', 'tensorrt', 'executorch', 'opencv_dnn', 'nert', 'libtorch', 'libtensorflow', 'litert')
 PACKAGES = ('build-essential', 'cmake', 'ninja-build', 'pkg-config', 'git', 'curl',
             'wget', 'unzip', 'xz-utils', 'zstd', 'ca-certificates', 'python3',
             'python3-venv', 'python3-pip', 'libopencv-dev', 'libgoogle-glog-dev',
@@ -179,7 +180,7 @@ def copy_overlay(source, destination):
     else:
         manifest = source / 'installer-files.json'
         names = json.loads(manifest.read_text())
-    names += ['install.sh', 'scripts/install.py', 'scripts/launch.py', 'scripts/github_release.py', 'docker/Dockerfile.ui']
+    names += ['install.sh', 'scripts/install.py', 'scripts/launch.py', 'scripts/github_release.py', 'scripts/sdk_provenance.py', 'docker/Dockerfile.ui']
     copied = []
     for name in dict.fromkeys(names):
         if not name:
@@ -312,6 +313,76 @@ def install_sdk(backend, prefix, sources, versions, environment, jobs):
         environment['LD_LIBRARY_PATH'] = f'{trt}/lib:{toolkit}/lib64'
         flags += [f'-DTENSORRT_DIR={trt}', f'-DCUDAToolkit_ROOT={toolkit}',
                   f'-DCUDAToolkit_NVCC_EXECUTABLE={toolkit}/bin/nvcc']
+    elif backend == 'libtorch':
+        version = versions['PYTORCH_VERSION']
+        filename = f'libtorch-shared-with-deps-{version}+cpu.zip'
+        archive = download(f'https://download.pytorch.org/libtorch/cpu/{filename.replace("+", "%2B")}',
+                           prefix / 'downloads' / filename)
+        extract(archive, sdk)
+        installed = sdk / 'libtorch'
+        actual = libtorch_sdk(installed, version)['build']
+        if actual != f'{version}+cpu':
+            raise ValueError(f'Unexpected LibTorch build: {actual}')
+        flags += [f'-DLIBTORCH_DIR={installed}', f'-DTorch_DIR={installed}/share/cmake/Torch',
+                  '-DLIBTORCH_VARIANT=cpu', '-DCMAKE_CXX_STANDARD=20']
+    elif backend == 'libtensorflow':
+        venv = sdk / 'tensorflow-python'
+        command([sys.executable, '-m', 'venv', venv])
+        command([venv / 'bin/pip', 'install', '--only-binary=:all:', f'tensorflow=={versions["TENSORFLOW_VERSION"]}'])
+        module = Path(command([venv / 'bin/python', '-c',
+                              'import importlib.util;print(next(iter(importlib.util.find_spec("tensorflow").submodule_search_locations)))'],
+                              capture=True).strip())
+        installed = sdk / 'tensorflow'
+        installed.mkdir()
+        (installed / 'include').symlink_to(module / 'include')
+        (installed / 'lib').mkdir()
+        for name in ('tensorflow_cc', 'tensorflow_framework'):
+            (installed / f'lib/lib{name}.so.2').symlink_to(module / f'lib{name}.so.2')
+            (installed / f'lib/lib{name}.so').symlink_to(f'lib{name}.so.2')
+        environment['LD_LIBRARY_PATH'] = str(installed / 'lib')
+        flags += [f'-DTENSORFLOW_DIR={installed}']
+    elif backend == 'litert':
+        version = versions['LITERT_VERSION']
+        src = sdk / 'source/tensorflow'
+        command(['git', 'clone', '--depth', '1', '--branch', f'v{version}',
+                 'https://github.com/tensorflow/tensorflow.git', src])
+        # Protobuf's tests are disabled upstream. Fetch the exact upstream pin
+        # without recursively downloading its unused googletest submodule.
+        protobuf_module = src / 'tensorflow/lite/tools/cmake/modules/protobuf.cmake'
+        protobuf_pin = re.search(r'GIT_TAG\s+([0-9a-f]{40})', protobuf_module.read_text()).group(1)
+        protobuf = sdk / 'source/protobuf'
+        command(['git', 'init', protobuf])
+        command(['git', '-C', protobuf, 'remote', 'add', 'origin', 'https://github.com/protocolbuffers/protobuf.git'])
+        command(['git', '-C', protobuf, 'fetch', '--depth', '1', 'origin', protobuf_pin])
+        command(['git', '-C', protobuf, 'checkout', '--detach', 'FETCH_HEAD'])
+        build = sdk / 'litert-build'
+        installed = sdk / 'litert'
+        command(['cmake', '-S', src / 'tensorflow/lite', '-B', build, '-GNinja',
+                 '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON', '-DTFLITE_ENABLE_INSTALL=OFF',
+                 f'-DFETCHCONTENT_SOURCE_DIR_PROTOBUF={protobuf}'])
+        targets = ['tensorflow-lite', *['absl_' + name for name in (
+            'log_internal_message', 'log_internal_check_op', 'log_internal_conditions',
+            'log_internal_format', 'log_internal_globals', 'log_internal_log_sink_set',
+            'log_internal_nullguard', 'log_entry', 'log_globals', 'log_initialize', 'log_sink')]]
+        command(['cmake', '--build', build, '--target', *targets, '--parallel', jobs])
+        headers = installed / 'include'
+        headers.mkdir(parents=True)
+        shutil.copytree(src / 'tensorflow', headers / 'tensorflow')
+        for parent in (build, src / 'third_party'):
+            for path in sorted(parent.rglob('*')):
+                if path.is_dir() and path.name in ('include', 'absl', 'Eigen', 'flatbuffers', 'ruy'):
+                    destination = headers if path.name == 'include' else headers / path.name
+                    shutil.copytree(path, destination, dirs_exist_ok=True)
+        libraries = installed / 'lib'
+        libraries.mkdir()
+        for path in sorted(build.rglob('*')):
+            if path.is_file() and ('.so' in path.name or path.suffix == '.a'):
+                shutil.copy2(path, libraries / path.name)
+        (libraries / 'libtensorflowlite.so').symlink_to('libtensorflow-lite.so')
+        litert_sdk(installed, version)
+        (installed / 'neuriplo-version.txt').write_text(version + '\n')
+        environment['LD_LIBRARY_PATH'] = str(libraries)
+        flags += [f'-DLITERT_DIR={installed}']
     elif backend == 'opencv_dnn':
         version = versions['OPENCV_VERSION']
         path = sdk / 'opencv-source'

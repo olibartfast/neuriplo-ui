@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 from github_release import latest_release
+from sdk_provenance import libtorch_sdk, litert_sdk
 
 
 def run(*args):
@@ -55,6 +56,16 @@ def verify_ui_revision(includes_current_master):
     if not includes_current_master:
         raise ValueError('UI checkout is behind current origin/master; fetch and integrate it before browser validation')
 
+
+
+def verify_runtime_version(runtime, symbol, expected):
+    library = ctypes.CDLL(str(runtime))
+    query = getattr(library, symbol)
+    query.restype = ctypes.c_char_p
+    actual = query().decode()
+    if actual != expected:
+        raise ValueError(f'Installed runtime {runtime}: {actual}, expected {expected}')
+    return actual
 
 
 def main():
@@ -129,6 +140,28 @@ def main():
                'cache_sha256': digest(cache), 'sources': identities,
                'shared_libraries': {path: digest(path) for path in linked}}
     backends = [b for w in capabilities['execution']['workflows'] for b in w['backends']]
+    sdk_versions = dict(re.findall(r'^([A-Z_]+)=[\"\']?([^\n\"\']+)',
+                                   (Path(identities['neuriplo']['source']) / 'versions.env').read_text(), re.M))
+    if 'libtorch' in backends:
+        prefix = Path(values['LIBTORCH_DIR'])
+        info = libtorch_sdk(prefix, sdk_versions['PYTORCH_VERSION'])
+        if not any(Path(p).name.startswith('libtorch_cpu.so') and Path(p).resolve().is_relative_to(prefix.resolve()) for p in linked):
+            raise ValueError('Cannot identify linked LibTorch CPU runtime')
+        current['libtorch'] = info
+    for backend, key, filename, symbol in (
+            ('libtensorflow', 'TENSORFLOW', 'libtensorflow_cc.so.2', 'TF_Version'),
+            ('litert', 'LITERT', 'libtensorflow-lite.so', 'TfLiteVersion')):
+        if backend not in backends:
+            continue
+        prefix = Path(values[key + '_DIR'])
+        runtime = prefix / 'lib' / filename
+        if not any(Path(p).resolve() == runtime.resolve() for p in linked):
+            raise ValueError(f'Cannot identify linked {backend} runtime')
+        if backend == 'litert':
+            current[backend] = litert_sdk(prefix, sdk_versions[key + '_VERSION'])
+        else:
+            actual = verify_runtime_version(runtime, symbol, sdk_versions[key + '_VERSION'])
+            current[backend] = {'version': actual, 'runtime_sha256': digest(runtime)}
     if 'tensorrt' in backends:
         prefix = Path(values['TENSORRT_DIR'])
         library = ctypes.CDLL(str(prefix / 'lib/libnvinfer.so'))

@@ -63,9 +63,12 @@ runtime, the released C++ components and the selected backend SDK. No separate
 manual installation of those dependencies is needed. Supply your own model
 weights and inputs in `~/Neuriplo`.
 
-Select `openvino`, `tensorrt`, `executorch`, `opencv_dnn` or `nert` with
+Select `openvino`, `tensorrt`, `executorch`, `opencv_dnn`, `nert`, `libtorch`,
+`libtensorflow` or `litert` with
 `--backend`. TensorRT requires NVIDIA hardware and a working host driver; the
 installer can provision a missing driver with `--install-driver` (then reboot).
+For OpenCV DNN, **OpenCV 5 is preferred** over OpenCV 4.x; the installer builds
+the OpenCV 5 release pinned by the core library.
 See the [installation guide](docs/Installation.md) for launchers, workspace
 selection, client-server configuration and platform/profile validation limits.
 

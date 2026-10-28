@@ -30,6 +30,19 @@ class InstallerTests(unittest.TestCase):
                 fetch.assert_not_called()
                 command.assert_not_called()
 
+    def test_libtorch_rejects_archive_with_wrong_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            prefix = Path(directory)
+            def unpack(*args):
+                sdk = prefix / 'sdk/libtorch'
+                sdk.mkdir()
+                (sdk / 'build-version').write_text('2.0.1+cu118')
+            with patch.object(installer, 'download', return_value=prefix / 'archive.zip'), \
+                    patch.object(installer, 'extract', side_effect=unpack):
+                with self.assertRaisesRegex(ValueError, 'Installed LibTorch'):
+                    installer.install_sdk('libtorch', prefix, prefix / 'sources',
+                                          {'PYTORCH_VERSION': '2.14.0'}, {}, 2)
+
     def test_archive_cannot_write_outside_installation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

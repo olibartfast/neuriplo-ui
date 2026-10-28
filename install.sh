@@ -11,7 +11,7 @@ for arg in "$@"; do
     if command -v python3 >/dev/null 2>&1 && [[ -n "$script_dir" && -f "$script_dir/scripts/install.py" ]]; then
       exec python3 "$script_dir/scripts/install.py" "$@"
     fi
-    echo 'Usage: ./install.sh --style native|docker --backend onnx_runtime|openvino|tensorrt|executorch|opencv_dnn|nert [--prefix DIR] [--dry-run] [--start]'
+    echo 'Usage: ./install.sh --style native|docker --backend onnx_runtime|openvino|tensorrt|executorch|opencv_dnn|nert|libtorch|libtensorflow|litert [--prefix DIR] [--dry-run] [--start]'
     exit 0
   fi
 done

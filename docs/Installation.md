@@ -64,7 +64,10 @@ Choose one backend for each installation prefix:
 | `openvino` | OpenVINO SDK from its pinned PyPI wheel, in a private Python environment. |
 | `tensorrt` | TensorRT SDK and the CUDA toolkit. |
 | `executorch` | ExecuTorch source build with XNNPACK. This can take substantially longer. |
-| `opencv_dnn` | The recommended OpenCV release, built from source with DNN support. |
+| `opencv_dnn` | **OpenCV 5 (preferred over 4.x)**, built from source with DNN support. |
+| `libtorch` | LibTorch CPU binary SDK; C++20 for current releases. |
+| `libtensorflow` | TensorFlow C++ libraries and headers from the pinned wheel in a private Python environment. |
+| `litert` | TensorFlow Lite / LiteRT C++ runtime built from the core-pinned TensorFlow source release. |
 | `nert` | The first-party NERT backend fetched by the released core library. |
 
 The installer resolves the latest `neuriplo-infer`, `neuriplo` and
@@ -74,7 +77,10 @@ Other sibling dependencies follow the inference release's pins. Exact commits,
 SDK pins and executable hashes are recorded in the installation directory.
 
 ONNX Runtime uses the CPU distribution. OpenVINO is provisioned for CPU execution.
-TensorRT is the NVIDIA GPU profile. Models must match the selected SDK and task;
+TensorRT is the NVIDIA GPU profile. The LibTorch, LibTensorFlow and LiteRT profiles
+target CPU execution. LibTorch expects a TorchScript export; LibTensorFlow expects
+a SavedModel directory; LiteRT expects a `.tflite` model. These formats are not
+interchangeable. Models must match the selected SDK and task;
 installing a runtime does not validate every supported model.
 
 All installations include the KServe V2 HTTP client. Add `--grpc` to install its
@@ -102,6 +108,9 @@ enable **No display** before running inference. This suppresses the native OpenC
 window; the processed result remains available in the web preview and downloads.
 
 ### OpenCV DNN inputs
+
+**OpenCV 5 is preferred over OpenCV 4.x** for OpenCV DNN. The installer uses the
+core-pinned OpenCV 5 release; the system OpenCV package may be 4.x.
 
 OpenCV DNN requires explicit input sizes. For the tested YOLO26s ONNX model,
 open Advanced controls and set **Input sizes** to `3,640,640`; batch size remains
@@ -168,13 +177,23 @@ selection, a fully visible result preview and artifact download.
 | OpenVINO CPU | 2026.3.0 | Native | YOLO26s |
 | TensorRT | 11.2.1.2 | Docker on an existing NVIDIA host; fresh engine built with the installed SDK | YOLO26s |
 | NERT CPU (experimental) | 0.2.0 | Docker | YOLO26s |
+| LibTorch CPU | 2.14.0 | Docker | ResNet-18 TorchScript, classification |
+| LibTensorFlow CPU | 2.19.0 | Docker, including slow capabilities discovery | MobileNetV2 SavedModel, classification |
+| LiteRT CPU | 2.19.0 (TensorFlow Lite C++ integration) | Native in an isolated Ubuntu 24.04 container | MobileNetV2 TFLite, classification |
 | ExecuTorch CPU / XNNPACK | 1.2.0 | Docker | YOLOv8n |
 | OpenCV DNN CPU | 5.0.0, native DNN engine | Docker | YOLO26s, input sizes `3,640,640` |
 
 Client-server HTTP and gRPC runs also completed against a real server with
-YOLO26. CI installs and starts ONNX Runtime with gRPC, OpenVINO and NERT CPU
-profiles; its startup checks are separate from the real-model browser checks.
+YOLO26. CI installs and starts ONNX Runtime with gRPC, OpenVINO, NERT, LibTorch,
+LibTensorFlow and LiteRT CPU profiles; its startup checks are separate from the real-model browser checks.
 Results cover the listed models and execution paths, not every task/model pair.
+The MobileNetV2 validation exports embed input adaptation for the RGB ImageNet
+normalization used by the `torchvision-classifier` task alias. That alias selects
+classification preprocessing; the selected backend determines the runtime.
+
+The released infer classification renderer can truncate the top-five caption at
+the image edge. Checks verify the leading class, the image preview bounds and the
+downloadable file.
 
 Automatic Docker Engine and NVIDIA Container Toolkit provisioning was also tested
 in a fresh Ubuntu 24.04 userspace with an isolated Docker daemon. The shipped

@@ -67,7 +67,7 @@ jobs:
 
   installer-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -77,6 +77,12 @@ jobs:
           - backend: openvino
             grpc: false
           - backend: nert
+            grpc: false
+          - backend: libtorch
+            grpc: false
+          - backend: libtensorflow
+            grpc: false
+          - backend: litert
             grpc: false
     permissions:
       contents: read
@@ -102,9 +108,12 @@ jobs:
           launcher_pid=$!
           trap 'kill "$launcher_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:5373/api/health; then break; fi
+            if grep -q '^Neuriplo UI:' "$RUNNER_TEMP/installed-ui.log"; then break; fi
+            if ! kill -0 "$launcher_pid" 2>/dev/null; then cat "$RUNNER_TEMP/installed-ui.log"; exit 1; fi
             sleep 1
           done
+          grep -q '^Neuriplo UI:' "$RUNNER_TEMP/installed-ui.log"
+          curl --fail --silent http://127.0.0.1:5373/api/health
           curl --fail --silent http://127.0.0.1:5373/ | grep -q '<div id="root">'
           curl --fail --silent http://127.0.0.1:5373/api/capabilities > "$RUNNER_TEMP/installed-capabilities.json"
           python3 - "$RUNNER_TEMP/installed-capabilities.json" <<'PY'
