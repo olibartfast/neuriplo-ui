@@ -147,7 +147,7 @@ bash install.sh --style native --backend onnx_runtime \
   --prefix "$HOME/neuriplo-local" --with-tests
 ```
 
-OpenCV DNN and ExecuTorch compile their SDKs from source and can take
+OpenCV DNN, ExecuTorch and LiteRT compile their SDKs from source and can take
 substantially longer than installing a binary SDK. TensorRT also downloads the
 CUDA toolkit and a multi-gigabyte SDK archive.
 
@@ -177,9 +177,9 @@ selection, a fully visible result preview and artifact download.
 | OpenVINO CPU | 2026.3.0 | Native | YOLO26s |
 | TensorRT | 11.2.1.2 | Docker on an existing NVIDIA host; fresh engine built with the installed SDK | YOLO26s |
 | NERT CPU (experimental) | 0.2.0 | Docker | YOLO26s |
-| LibTorch CPU | 2.14.0 | Docker | ResNet-18 TorchScript, classification |
-| LibTensorFlow CPU | 2.19.0 | Docker, including slow capabilities discovery | MobileNetV2 SavedModel, classification |
-| LiteRT CPU | 2.19.0 (TensorFlow Lite C++ integration) | Native in an isolated Ubuntu 24.04 container | MobileNetV2 TFLite, classification |
+| LibTorch CPU | 2.14.0 | Docker | YOLO26s TorchScript, object detection |
+| LibTensorFlow CPU | 2.19.0 | Docker, including slow capabilities discovery | YOLO26s SavedModel, object detection |
+| LiteRT CPU | 2.19.0 (TensorFlow Lite C++ integration) | Native in an isolated Ubuntu 24.04 container | YOLO26s TFLite FP32, object detection |
 | ExecuTorch CPU / XNNPACK | 1.2.0 | Docker | YOLOv8n |
 | OpenCV DNN CPU | 5.0.0, native DNN engine | Docker | YOLO26s, input sizes `3,640,640` |
 
@@ -187,9 +187,21 @@ Client-server HTTP and gRPC runs also completed against a real server with
 YOLO26. CI installs and starts ONNX Runtime with gRPC, OpenVINO, NERT, LibTorch,
 LibTensorFlow and LiteRT CPU profiles; its startup checks are separate from the real-model browser checks.
 Results cover the listed models and execution paths, not every task/model pair.
-The MobileNetV2 validation exports embed input adaptation for the RGB ImageNet
-normalization used by the `torchvision-classifier` task alias. That alias selects
-classification preprocessing; the selected backend determines the runtime.
+LibTorch, LibTensorFlow and LiteRT use YOLO26s detection as the primary real-model
+check, with TorchScript, SavedModel and FP32 TFLite exports respectively. The
+LibTorch run requires **Input sizes** `1,3,640,640`; the TensorFlow and LiteRT
+exports have NHWC inputs `1,640,640,3` and infer their dimensions from the model.
+
+Export references are available in the sibling
+[object-detection guide](https://github.com/olibartfast/neuriplo-tasks/blob/v0.8.2/export/detection/ObjectDetection.md)
+and the [SavedModel launch examples](https://github.com/olibartfast/neuriplo-infer/blob/v0.11.2/.vscode/launch.json).
+The tested SavedModel and FP32 TFLite files were generated from the same YOLO26s
+ONNX graph using `onnx2tf` with signature definitions enabled (`-osd`).
+
+Earlier ResNet-18 and MobileNetV2 classification runs remain basic smoke checks.
+The MobileNetV2 exports embed input adaptation for the RGB ImageNet normalization
+used by the `torchvision-classifier` task alias; they are separate from the primary
+YOLO26s validation.
 
 The released infer classification renderer can truncate the top-five caption at
 the image edge. Checks verify the leading class, the image preview bounds and the
