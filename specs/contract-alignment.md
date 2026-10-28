@@ -67,3 +67,18 @@ Version audit 2026-10-26 (GitHub releases and remote branch heads checked live):
 Fresh-release validation subsequently completed 80 successful Chrome UI
 inferences on infer 0.11.2, neuriplo 0.11.1 and tasks 0.8.2. The older 0.10.3
 run above remains historical evidence only.
+
+Current-stack validation 2026-10-28 (infer 0.11.3, neuriplo 0.11.2,
+tasks 0.8.2, CPU OpenCV DNN 5.0.0): isolated release checkouts, fresh
+configured build, `validate:stack --rebuild` passed (exit 0, manifest
+`neuriplo-ui-provenance.json` in the new build dir). Real Chrome inference
+through the UI on the verified binary (hash matches the manifest):
+object detection `yolo11` on `bus.jpg` with `yolo11s.onnx` and `3,640,640`
+CHW input, run `bd53a05f-da45-4d9b-a926-f3a764427384`, status success,
+exit 0, 10.75 s adapter duration (375 ms logged inference, 9.98 s one-time
+model load). Annotated bus/people preview loaded (positive natural width)
+and both artifacts downloaded over HTTP. Evidence:
+`/tmp/neuriplo-0.11.3-chrome.mjs`,
+`/tmp/neuriplo-0.11.3-browser/{run.json,result.png,hashes.json,data_output_*}`,
+gate log `/tmp/neuriplo-stack-0.11.3-gate.log`.
+Unit suites: web 86/86, server 87/87.
