@@ -149,6 +149,14 @@ def main():
     current = {'validation': validation, 'binary': str(binary), 'binary_sha256': digest(binary),
                'cache_sha256': digest(cache), 'sources': identities,
                'shared_libraries': {path: digest(path) for path in linked}}
+    if values.get('NEURIPLO_INFER_BUILD_VALIDATION_TOOLS', '').upper() in {'ON', 'YES', 'TRUE', '1'}:
+        tool = build / 'app/neuriplo-model-validation'
+        if not tool.is_file():
+            raise ValueError('Configured validation tool was not produced by the clean build')
+        tool_libraries = sorted(set(re.findall(r'(?:=>\s+)?(/\S+)\s+\(', run('ldd', str(tool)))))
+        current['validation_tools'] = {str(tool): {
+            'sha256': digest(tool),
+            'shared_libraries': {path: digest(path) for path in tool_libraries}}}
     backends = [b for w in capabilities['execution']['workflows'] for b in w['backends']]
     sdk_versions = dict(re.findall(r'^([A-Z_]+)=[\"\']?([^\n\"\']+)',
                                    (Path(identities['neuriplo']['source']) / 'versions.env').read_text(), re.M))
