@@ -12,6 +12,7 @@ import sys
 
 from github_release import latest_release
 from sdk_provenance import libtorch_sdk, litert_sdk
+from stack_candidates import load_candidates, verify_candidate, verify_cache_pin, remote_release_commit
 
 
 def run(*args):
@@ -72,6 +73,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-dir', type=Path)
     parser.add_argument('--rebuild', action='store_true')
+    parser.add_argument('--candidate-manifest', type=Path,
+                        help='Explicit remote candidate SHAs; produces candidate evidence, not release validation')
     parser.add_argument('--jobs', type=int, default=4, help='Parallel jobs for a clean rebuild')
     parser.add_argument('--if-configured', action='store_true',
                         help='Allow fixture-only E2E when no real executable is configured')
@@ -81,6 +84,7 @@ def main():
     if args.if_configured and not os.environ.get('NEURIPLO_INFER_BIN', '').strip():
         print('Fixture-only E2E: real stack provenance is not validated')
         return
+    candidates = load_candidates(args.candidate_manifest)
     ui = ui_identity()
     binary = Path(os.environ['NEURIPLO_INFER_BIN']).resolve(strict=not args.rebuild)
     build = (args.build_dir or binary.parent.parent).resolve()
@@ -96,13 +100,16 @@ def main():
             raise ValueError(f'{name}: tracked source changes; use a clean release checkout')
         release = latest_release(name)
         head = run('git', '-C', str(source), 'rev-parse', 'HEAD')
-        tag = run('git', '-C', str(source), 'rev-parse', f'{release}^{{commit}}')
-        if head != tag:
-            raise ValueError(f'{name}: checkout {head} is not latest release {release}')
         version = (source / 'VERSION').read_text().strip()
-        if version != release.removeprefix('v'):
-            raise ValueError(f'{name}: VERSION disagrees with release {release}')
-        identities[name] = {'source': str(source), 'commit': head, 'release': release}
+        if name in candidates:
+            identities[name] = verify_candidate(name, source, head, release, candidates[name], run)
+        else:
+            tag = run('git', '-C', str(source), 'rev-parse', f'{release}^{{commit}}')
+            if head != tag or head != remote_release_commit(name, release, run):
+                raise ValueError(f'{name}: checkout {head} is not latest release {release}')
+            if version != release.removeprefix('v'):
+                raise ValueError(f'{name}: VERSION disagrees with release {release}')
+            identities[name] = {'source': str(source), 'commit': head, 'release': release}
         versions[name] = version
     if 'nert_SOURCE_DIR' in values:
         source = Path(values['nert_SOURCE_DIR']).resolve()
@@ -125,8 +132,7 @@ def main():
     for key, name in [('CMAKE_PROJECT_VERSION', 'neuriplo-infer'),
                       ('NEURIPLO_VERSION', 'neuriplo'),
                       ('NEURIPLO_TASKS_VERSION', 'neuriplo-tasks')]:
-        if values[key].removeprefix('v') != versions[name]:
-            raise ValueError(f'{key}: stale cache {values[key]}, expected {versions[name]}')
+        verify_cache_pin(key, values[key], name, versions, candidates)
     manifest = build / 'neuriplo-ui-provenance.json'
     if args.rebuild:
         manifest.unlink(missing_ok=True)
@@ -136,7 +142,11 @@ def main():
     if capabilities['producer']['version'] != versions['neuriplo-infer']:
         raise ValueError('Executable version differs from current infer release')
     linked = sorted(set(re.findall(r'(?:=>\s+)?(/\S+)\s+\(', run('ldd', str(binary)))))
-    current = {'binary': str(binary), 'binary_sha256': digest(binary),
+    validation = {'mode': 'candidate' if candidates else 'released'}
+    if candidates:
+        validation['manifest_sha256'] = digest(args.candidate_manifest)
+        validation['candidates'] = candidates
+    current = {'validation': validation, 'binary': str(binary), 'binary_sha256': digest(binary),
                'cache_sha256': digest(cache), 'sources': identities,
                'shared_libraries': {path: digest(path) for path in linked}}
     backends = [b for w in capabilities['execution']['workflows'] for b in w['backends']]
@@ -219,7 +229,7 @@ def main():
     if not manifest.exists():
         raise ValueError('Unknown build provenance: use --rebuild after fresh configuration')
     verify_record(json.loads(manifest.read_text()), current)
-    print(json.dumps({'status': 'verified', 'ui': ui, **current}, indent=2))
+    print(json.dumps({'status': 'candidate_verified' if candidates else 'verified', 'ui': ui, **current}, indent=2))
 
 
 if __name__ == '__main__':

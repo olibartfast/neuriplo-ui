@@ -78,7 +78,7 @@ class ProvenanceTests(unittest.TestCase):
                         'execution': {'workflows': [{'backends': [backend]}]}}
                 def run(*args):
                     if args[0] == 'git':
-                        return '' if 'status' in args else 'released-commit'
+                        return '' if 'status' in args else (f'{"b" * 40}\t{args[-1]}' if 'ls-remote' in args else 'b' * 40)
                     return f'{runtime} (0x1)' if args[0] == 'ldd' else json.dumps(caps)
                 library = MagicMock()
                 library.TF_Version.return_value = b'2.19.0'
