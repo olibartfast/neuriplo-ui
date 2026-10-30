@@ -41,7 +41,10 @@ Validation is defined before the work; evidence is added as each phase runs.
   `neuriplo_input_dtypes.txt`; the originals are under
   `artifacts/model-matrix/legacy-libtorch-20261030/` with hashes in
   `resave.json`.
-- Re-ran the full libtorch matrix on the gated binary `d72f88d2…`.
+- Re-ran the full libtorch matrix on the gated binary `169f8944…` (infer
+  0.11.6 / core 0.11.3 / tasks 0.8.4). The first pass ran on the 0.11.5 gate;
+  the cells were repeated after the 0.11.6 release so their evidence matches
+  the current tag.
 - Result: 19 `RUNTIME_PASS`, 3 `TIMEOUT`, 20 `EXPORT_BLOCKED`, 1
   `NOT_APPLICABLE`. The timeouts are `videomae`, `vivit` and `timesformer`:
   they load and start inference, but exceed the matrix's 5-minute CPU budget.
@@ -68,5 +71,14 @@ Validation is defined before the work; evidence is added as each phase runs.
 - Cause confirmed: PyTorch 2.14 publishes `libtorch-shared-with-deps-2.14.0+cpu.zip`,
   not the cxx11-abi variant. The infer Dockerfile was corrected on the 0.11.6
   release branch; the Slurm session will be replayed after the tag.
+- Replay of `v0.11.6` (job 18) passed the download but failed at CMake:
+  Ubuntu 22.04 ships CMake 3.22, while the project requires 3.24. The
+  Dockerfile now defaults to Ubuntu 24.04 on develop; job 19 validates it.
+  This second fix is not in the published 0.11.6 and belongs to the next
+  release. The v0.11.6 release note was corrected to say so.
+- Job 19 (`infer-libtorch-r3`) completed the Docker build from develop:
+  `BUILD_OK`, image `sha256:e67403a7…`. The image contains the CLI, not the
+  UI adapter, and its binary does not match the gated local hash; it is a
+  pre-screening asset, not official matrix evidence.
 - Slurm accounting storage is disabled on this cluster, so the outcome comes
   from the job log rather than `sacct`.
