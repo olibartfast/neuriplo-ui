@@ -1,5 +1,6 @@
 import copy
 import io
+import itertools
 import json
 import importlib.util
 from pathlib import Path
@@ -50,8 +51,8 @@ class ProvenanceTests(unittest.TestCase):
     def test_new_backend_pins_do_not_require_sdk_versions_in_cmake_cache(self):
         # Regression: these vendor versions are normal CMake variables, not
         # cache entries. A configured build still has the clean release pins.
-        for backend in ('libtorch', 'libtensorflow', 'litert'):
-            with self.subTest(backend=backend), tempfile.TemporaryDirectory() as directory:
+        for backend, tools, candidate in itertools.product(('libtorch', 'libtensorflow', 'litert'), (False, True), (False, True)):
+            with self.subTest(backend=backend, tools=tools, candidate=candidate), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 build = root / 'build'; binary = build / 'app/neuriplo-infer'
                 binary.parent.mkdir(parents=True); binary.write_text('unit fixture')
@@ -74,17 +75,33 @@ class ProvenanceTests(unittest.TestCase):
                 runtime = sdk / 'lib' / {'libtorch': 'libtorch_cpu.so',
                     'libtensorflow': 'libtensorflow_cc.so.2', 'litert': 'libtensorflow-lite.so'}[backend]
                 runtime.write_text('unit fixture')
+                argv = ['validate-stack.py', '--rebuild']
+                tool = build / 'app/neuriplo-model-validation'
+                if tools:
+                    values['NEURIPLO_INFER_BUILD_VALIDATION_TOOLS'] = 'ON'
+                    tool.write_text('unit fixture for configured tool')
+                if candidate:
+                    manifest = root / 'candidate.json'
+                    manifest.write_text(json.dumps({'candidates': {'neuriplo': {
+                        'commit': 'a' * 40, 'ref': 'refs/heads/feature/candidate'}}}))
+                    values['NEURIPLO_VERSION'] = 'a' * 40
+                    argv += ['--candidate-manifest', str(manifest)]
                 caps = {'producer': {'version': '0.11.2'},
                         'execution': {'workflows': [{'backends': [backend]}]}}
                 def run(*args):
                     if args[0] == 'git':
-                        return '' if 'status' in args else 'released-commit'
+                        if 'status' in args or 'merge-base' in args:
+                            return ''
+                        if 'ls-remote' in args:
+                            sha = 'a' * 40 if args[-1].startswith('refs/heads/') else 'b' * 40
+                            return f'{sha}\t{args[-1]}'
+                        return 'a' * 40 if candidate and args[2] == str(root / 'neuriplo') and args[-1] == 'HEAD' else 'b' * 40
                     return f'{runtime} (0x1)' if args[0] == 'ldd' else json.dumps(caps)
                 library = MagicMock()
                 library.TF_Version.return_value = b'2.19.0'
                 library.TfLiteVersion.return_value = b'2.19.0'
                 with patch.dict(gate.os.environ, {'NEURIPLO_INFER_BIN': str(binary)}), \
-                        patch('sys.argv', ['validate-stack.py', '--rebuild']), \
+                        patch('sys.argv', argv), \
                         patch.object(gate, 'ui_identity', return_value={}), \
                         patch.object(gate, 'cache_values', return_value=values), \
                         patch.object(gate, 'latest_release', side_effect=lambda n: 'v' + releases[n]), \
@@ -93,7 +110,14 @@ class ProvenanceTests(unittest.TestCase):
                         patch.object(gate.ctypes, 'CDLL', return_value=library), \
                         patch('sys.stdout', new_callable=io.StringIO) as output:
                     gate.main()
-                    self.assertEqual(json.loads(output.getvalue())['status'], 'verified')
+                    report = json.loads(output.getvalue())
+                    self.assertEqual(report['status'], 'candidate_verified' if candidate else 'verified')
+                    self.assertEqual('validation_tools' in report, tools)
+                    if tools:
+                        self.assertEqual(report['validation_tools'][str(tool)]['sha256'], gate.digest(tool))
+                        tool.unlink()
+                        with self.assertRaisesRegex(ValueError, 'not produced'):
+                            gate.main()
 
     def test_matching_record(self):
         gate.verify_record(self.record, copy.deepcopy(self.record))

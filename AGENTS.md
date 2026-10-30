@@ -4,6 +4,10 @@
   NEURIPLO_INFER_BIN set to the exact adapter executable. The gate must pass.
 - Read README's build provenance procedure. Use current released infer, neuriplo
   and neuriplo-tasks revisions; their version numbers are independent.
+  For pre-release correction testing, an explicit `--candidate-manifest` may
+  select clean remote commits containing the latest releases. Pin candidate
+  dependencies to full SHAs. A `candidate_verified` report is distinct from
+  released-stack validation; the default gate stays release-only.
 - Never equate checkout VERSION, CMake cache pins, or a successful old binary run
   with the versions actually compiled. Unknown provenance blocks current-stack
   validation. Never manufacture an attestation for an existing binary.
@@ -20,3 +24,8 @@
 
 - The UI checkout must include current remote master before browser validation
   or recording. The stack gate checks this and records UI source hashes.
+
+- Before a release, validate the applicable task/model/backend matrix with real
+  weights and inspect the actual outputs against references. CI success or an
+  exit code of zero alone does not establish runtime correctness. Record blocked
+  and unsupported combinations explicitly; do not silently omit them.

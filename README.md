@@ -205,6 +205,23 @@ fresh build with `npm run validate:stack -- --rebuild`; never attest an old bina
 Re-run the gate after build, dependency, checkout or executable changes. The
 browser adapter must use the exact verified executable hash.
 
+To validate fixes before publishing a release, agent tooling can select explicit
+candidate commits:
+
+```bash
+npm run validate:stack -- --candidate-manifest candidate-stack.json --rebuild
+```
+
+The manifest has a `candidates` object keyed by `neuriplo-infer`, `neuriplo`,
+and/or `neuriplo-tasks`. Each entry contains `commit` (the full 40-character SHA)
+and `ref` (its remote branch, for example `refs/heads/feature/my-fix`). The gate
+checks the official repository, latest-release ancestry, clean sources, exact
+candidate dependency pins, SDKs and a clean rebuild. Components omitted from the
+manifest must still match their latest release. The report is marked
+`candidate_verified`; it must not be presented as validation of a published
+release. The browser must use the candidate report's exact executable hash.
+
+
 Sources are staged as symlinks in each private run directory so source-relative
 outputs, including optical flow, remain discoverable. Input symlinks are excluded
 from artifact listings and downloads.
