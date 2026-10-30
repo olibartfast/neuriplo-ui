@@ -304,6 +304,23 @@ on `0.0.0.0` while proxying to that adapter, which is the Phase 5 preview
 finding in the place a developer actually runs. Both servers now bind loopback,
 with `NEURIPLO_UI_HOST` as the opt-in.
 
+## Phase 8 — Matrix coverage closure
+
+Status: in progress. Spec:
+[Matrix coverage](2026-10-30-matrix-coverage/requirements.md).
+
+Goal: finish the task-model × backend matrix on the current release stack.
+
+- [ ] Re-export the 17 legacy TorchScript artifacts with input-datatype
+  metadata and re-run their libtorch cells.
+- [ ] Execute or classify the 13 PENDING cells.
+- [ ] Triage the remaining FAILED cells into backend limitations, model
+  defects, or fixture defects.
+- [ ] Use the platform Slurm cluster for parallel backend builds and
+  pre-screening, without substituting its binary for the gated evidence.
+- [ ] Update the coverage report and backend documentation; record every
+  blocked and unsupported combination.
+
 ## Guiding rule
 
 Real-stack validation now has a mandatory provenance gate; see
