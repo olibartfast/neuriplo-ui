@@ -165,3 +165,13 @@ Validation is defined before the work; evidence is added as each phase runs.
   `nert/tensorflow-classifier`: exit 0, malamute 0.532603. The P3-02
   stale-preprocessor diagnosis is now confirmed on both cells; the
   size-mismatch FAILED pair is fully closed (ort cell earlier today).
+
+### 2026-10-31 — Phase 5 doc pass (no status changes)
+
+- Regenerated `REPORT.md` from the gated runs (176/22/12/10/159/51).
+- `plan.md`: Phase 3 → done, Phase 4 → done as pre-screen/build only,
+  Phase 5 → done.
+- `neuriplo-infer` (develop): `docs/BackendCoverage.md` header to the
+  0.11.6 stack with the new blockers recorded and a pointer to the 13
+  ui-matrix decisions; `CHANGELOG.md` Unreleased gains a Documentation
+  entry. No release without explicit user order.

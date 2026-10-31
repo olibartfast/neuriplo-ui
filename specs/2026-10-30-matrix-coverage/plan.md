@@ -34,7 +34,14 @@ backends (empty export); everything else passes.
 
 ## Phase 3 — Failure triage
 
-Status: planned.
+Status: done (2026-10-31). 13 decisions in
+`artifacts/model-matrix/decisions.json`, all PENDING closed, P3-06 single
+re-run banked: 4 promotions (`nert/depth_anything_v2`, `opencv_dnn` video
+trio on Pexels footage), 1 reclassification (`opencv_dnn/groundingdino`
+fast single-input refusal), 12 confirmed CPU timeouts, stale-stack pair
+(`onnx_runtime` + `nert` tensorflow-classifier) promoted after container
+rebuilds on the release stack. Matrix: 176 RUNTIME_PASS / 22 FAILED /
+12 TIMEOUT / 10 KNOWN_BAD / 159 EXPORT_BLOCKED / 51 NOT_APPLICABLE.
 
 Group the remaining FAILED cells:
 
@@ -54,9 +61,13 @@ a point in the report.
 
 ## Phase 4 — Slurm parallel session
 
-Status: in progress. Session `2026-10-30-matrix-coverage-1` found a broken
-LibTorch download URL; the fix is on the 0.11.6 release branch, and the
-session is replayed after the tag.
+Status: done as pre-screen/build only (D-1: official evidence uses the
+gated binary). Session `2026-10-30-matrix-coverage-1` found the broken
+LibTorch URL fixed on the 0.11.6 branch. Session
+`2026-10-31-ort-rebuild-1`: `sbatch` unreachable from this host
+(client/controller version mismatch), routed per runbook via SSH; remote
+`onnxruntime` image build failed (GPU tgz wget exit 8); local container
+rebuilds are the evidence that counts. `nert` has no Dockerfile.
 
 Define one scheduler job per backend build or pre-screening batch, following
 the platform runbook and job contract. Pin jobs to the x86 CPU profile, record
@@ -66,7 +77,13 @@ official cells still run against the gated binary.
 
 ## Phase 5 — Documentation and release note
 
-Status: planned.
+Status: done (2026-10-31, docs only, no statuses changed). `REPORT.md`
+regenerated from the gated runs (counts above); `BackendCoverage.md`
+header refreshed to the 0.11.6 stack with the new blockers recorded
+(single-input limit incl. 4-input groundingdino, EC GELU importer crash,
+OpenVINO video 5D crash) and a pointer to the 13 ui-matrix decisions;
+infer `CHANGELOG.md` Unreleased gains a Documentation entry. No release
+without explicit user order.
 
 Update `REPORT.md`, `BackendCoverage.md`, and the changelog for any status that
 changed. Record blocked and unsupported combinations explicitly. Only then
