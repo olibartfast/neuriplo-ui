@@ -82,3 +82,28 @@ Validation is defined before the work; evidence is added as each phase runs.
   pre-screening asset, not official matrix evidence.
 - Slurm accounting storage is disabled on this cluster, so the outcome comes
   from the job log rather than `sacct`.
+
+### 2026-10-31 — PENDING pre-screen via Slurm
+
+- Session `2026-10-31-matrix-coverage-2`; two builds ran in parallel:
+  LibTensorFlow on the 16-CPU x86 node and LiteRT on the 4-CPU x86 node.
+  Both finished `BUILD_OK` from infer v0.11.6 / core v0.11.3 / tasks v0.8.4.
+- LibTensorFlow image `sha256:4dd553fa…`; LiteRT image `sha256:a4aaa5c3…`.
+- Pre-screened the 11 LibTensorFlow/LiteRT PENDING cells with the CLI on the
+  recorded fixtures:
+  - pass and render correctly: yolov8pose, yolo11pose, vitpose, yolo-depth
+    and yolov10 on LibTensorFlow (5 cells);
+  - pass: yolov8pose, yolo11pose, yolo-depth and yolov10 on LiteRT (4 cells);
+  - `yolo26seg` on both backends exits 0 but renders no detections or masks.
+    A `yoloseg` control renders masks on the same image and backend, so the
+    yolo26seg export/conversion is the defect. The two cells are recorded as
+    KNOWN_BAD in the matrix with the re-export decision
+    `yolo26seg-export-empty`.
+- Not run: `opencv_dnn` tensorflow-classifier (no current-stack container;
+  the ONNX run already shows the fixture input-size mismatch) and TensorRT
+  owlvit (no NVIDIA profile online).
+- Evidence: `artifacts/model-matrix/prescreen-20261031/` (summary, images,
+  build logs).
+- The nine passing pre-screen cells remain PENDING until the official browser
+  evidence runs on the current per-backend containers; they are not promoted
+  from a CLI pre-screen.

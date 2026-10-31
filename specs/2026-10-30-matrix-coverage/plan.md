@@ -27,11 +27,11 @@ hash; every non-pass has a cause.
 
 ## Phase 2 — PENDING cells
 
-Status: planned.
-
-Run the 13 PENDING cells on the current stack. Where a cell cannot run, record
-the missing prerequisite (model artifact, fixture, backend build, hardware) and
-link the owning item. No cell stays PENDING without a reason.
+Status: in progress. The 11 LibTensorFlow/LiteRT cells were pre-screened on
+infer v0.11.6 via Slurm: 9 pass, `yolo26seg` is KNOWN_BAD on both, and the
+remaining `opencv_dnn`/TensorRT cells are blocked. Official browser evidence
+still needs current-stack per-backend containers; the CLI pre-screen does not
+promote a cell.
 
 ## Phase 3 — Failure triage
 
