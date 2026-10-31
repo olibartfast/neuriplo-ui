@@ -157,3 +157,11 @@ Validation is defined before the work; evidence is added as each phase runs.
   Dockerfile — skipped as pre-screen target; local rebuild queued instead.
 - Matrix totals: `RUNTIME_PASS` 175, `FAILED` 23, `TIMEOUT` 12,
   `KNOWN_BAD` 10, `EXPORT_BLOCKED` 159, `NOT_APPLICABLE` 51. 13 decisions.
+
+### 2026-10-31 — nert promotion (stale-stack pair closed)
+
+- Rebuilt the `nert` validation container on infer v0.11.6 / core v0.11.3 /
+  tasks v0.8.4 (gate `verified`, binary `12b8746b…`) and reran
+  `nert/tensorflow-classifier`: exit 0, malamute 0.532603. The P3-02
+  stale-preprocessor diagnosis is now confirmed on both cells; the
+  size-mismatch FAILED pair is fully closed (ort cell earlier today).
