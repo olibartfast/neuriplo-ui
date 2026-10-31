@@ -27,11 +27,10 @@ hash; every non-pass has a cause.
 
 ## Phase 2 — PENDING cells
 
-Status: in progress. The 11 LibTensorFlow/LiteRT cells were pre-screened on
-infer v0.11.6 via Slurm: 9 pass, `yolo26seg` is KNOWN_BAD on both, and the
-remaining `opencv_dnn`/TensorRT cells are blocked. Official browser evidence
-still needs current-stack per-backend containers; the CLI pre-screen does not
-promote a cell.
+Status: done. The per-backend containers were rebuilt on the current stack
+(infer v0.11.6 / core v0.11.3 / tasks v0.8.4) and all 13 cells now have
+official browser evidence. `yolo26seg` is KNOWN_BAD on both TensorFlow
+backends (empty export); everything else passes.
 
 ## Phase 3 — Failure triage
 

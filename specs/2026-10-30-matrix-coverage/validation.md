@@ -99,11 +99,34 @@ Validation is defined before the work; evidence is added as each phase runs.
     yolo26seg export/conversion is the defect. The two cells are recorded as
     KNOWN_BAD in the matrix with the re-export decision
     `yolo26seg-export-empty`.
-- Not run: `opencv_dnn` tensorflow-classifier (no current-stack container;
-  the ONNX run already shows the fixture input-size mismatch) and TensorRT
-  owlvit (no NVIDIA profile online).
+- Not run in the pre-screen: `opencv_dnn` tensorflow-classifier and
+  TensorRT owlvit. Both were closed afterwards with rebuilt containers (see
+  2026-10-31 entries below).
 - Evidence: `artifacts/model-matrix/prescreen-20261031/` (summary, images,
   build logs).
 - The nine passing pre-screen cells remain PENDING until the official browser
   evidence runs on the current per-backend containers; they are not promoted
   from a CLI pre-screen.
+
+### 2026-10-31 — PENDING closure with rebuilt containers
+
+- Rebuilt four validation containers on infer v0.11.6 / core v0.11.3 /
+  tasks v0.8.4 (existing SDKs, fresh source checkouts, `validate:stack
+  --rebuild` green):
+  - libtensorflow: binary `5ce8f7ce…`
+  - litert: binary `89a951c0…`
+  - opencv_dnn: binary `49737e78…`
+  - tensorrt: binary `f8b73ce5…` (CUDA 13.4, TRT 11.2.1.2, RTX 3060)
+- Browser evidence on the matching gates:
+  - libtensorflow: yolo26seg, yolov8pose, yolo11pose, vitpose, yolo-depth,
+    yolov10 all exit 0. The yolo26seg render is byte-identical to the empty
+    pre-screen image, so the KNOWN_BAD review stands.
+  - litert: all five exit 0; yolo26seg byte-identical to the empty
+    pre-screen render.
+  - opencv_dnn tensorflow-classifier: exits 0 and renders malamute 0.53,
+    Eskimo dog, Siberian husky on the dog fixture.
+  - tensorrt owlvit: exits 0 on the GPU engine and renders `a bicycle: 0.39`
+    on the dog fixture.
+- Matrix totals: 170 `RUNTIME_PASS`, 23 `FAILED`, 14 `TIMEOUT`,
+  10 `KNOWN_BAD`, 0 `PENDING`, 159 `EXPORT_BLOCKED`, 51 `NOT_APPLICABLE`,
+  3 `STALE_FIXTURE`.
