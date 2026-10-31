@@ -175,3 +175,16 @@ Validation is defined before the work; evidence is added as each phase runs.
   0.11.6 stack with the new blockers recorded and a pointer to the 13
   ui-matrix decisions; `CHANGELOG.md` Unreleased gains a Documentation
   entry. No release without explicit user order.
+
+### 2026-10-31 — neuriplo-infer v0.11.7 released
+
+- Release branch release/0.11.7 from develop: CHANGELOG 0.11.7 section
+  (Fixed: LibTorch image on Ubuntu 24.04 for CMake 3.28; Documentation:
+  coverage refresh), cut_release.sh pins unchanged (neuriplo v0.11.3,
+  tasks v0.8.4, videocapture v0.6.1, kserve-client v0.4.0 — the validated
+  matrix stack), validate_release_pins v0.11.7 green.
+- PR #77 merged to master (76fa152), tag v0.11.7 pushed, merged back to
+  develop (0 0 convergence), branch deleted, GitHub Release created.
+  Release Check on master in progress at tag time.
+- Post-release validation owed: LibTorch image rebuild on the new
+  Dockerfile + cell re-gate (build env changed, no inference code change).
