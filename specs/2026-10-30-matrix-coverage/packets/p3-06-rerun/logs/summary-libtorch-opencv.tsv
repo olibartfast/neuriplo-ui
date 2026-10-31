@@ -1,0 +1,8 @@
+cell	started_utc	exit	status	run_id	duration_ms
+libtorch/videomae	2026-10-31T14:58:26Z	0	FAILED	bc831dfa-ff8e-4155-a359-5c2c510e141d	300355.9
+libtorch/vivit	2026-10-31T15:06:47Z	0	FAILED	22f7ab2f-90ec-483a-ad0e-4a78dd1fe4c2	300575.574
+libtorch/timesformer	2026-10-31T15:15:06Z	0	FAILED	f883bb0e-7c71-49d7-b1e0-8a7565537628	300217.882
+opencv_dnn/groundingdino	2026-10-31T15:23:25Z	0	FAILED	eb5dfbda-9ca9-4fe7-b5f1-745b00dccbfe	13962.548
+opencv_dnn/videomae	2026-10-31T15:26:57Z	0	RUNTIME_PASS	1213f5d2-4f6c-499d-917a-6992a483742d	5360.966
+opencv_dnn/vivit	2026-10-31T15:30:20Z	0	RUNTIME_PASS	f8c8edb6-fe2d-4d2b-9c83-2df14206298f	13056.186
+opencv_dnn/timesformer	2026-10-31T15:33:49Z	0	RUNTIME_PASS	440e3175-a432-4db2-8a81-c507e7a8f2b0	5546.883

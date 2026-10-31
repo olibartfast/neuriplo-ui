@@ -130,3 +130,30 @@ Validation is defined before the work; evidence is added as each phase runs.
 - Matrix totals: 170 `RUNTIME_PASS`, 23 `FAILED`, 14 `TIMEOUT`,
   10 `KNOWN_BAD`, 0 `PENDING`, 159 `EXPORT_BLOCKED`, 51 `NOT_APPLICABLE`,
   3 `STALE_FIXTURE`.
+
+### 2026-10-31 — P3-06 single re-run + ort promotion (Phase 3 close)
+
+- Re-ran all 17 TIMEOUT/STALE cells once on the gated binaries (nert
+  `83b59ad6`, libtorch `169f8944`, opencv_dnn `49737e78`).
+- Promoted 4: `nert/depth_anything_v2` (ab76e529, TIMEOUT→PASS — runner path
+  sound, grounding the `nert-cpu-timeout` decision) and
+  `opencv_dnn/videomae, vivit, timesformer` on Pexels footage (STALE→PASS,
+  mp4 renders). STALE_FIXTURE is now 0.
+- Reclassified 1: `opencv_dnn/groundingdino` fails fast (14 s, run eb5dfbda,
+  4 inputs) under the single-input contract — decision
+  `opencv-dnn-groundingdino-four-input`, no longer TIMEOUT.
+- Confirmed 12: 9 nert TIMEOUTs (second timeout each, decision
+  `nert-cpu-timeout`) + 3 libtorch video CPU timeouts (existing decision;
+  timesformer passes only with a 900 s budget).
+- Rebuilt the `ort-smoke` validation container on infer v0.11.6 / core
+  v0.11.3 / tasks v0.8.4 (gate `verified`, binary `02e359a7…`) and reran
+  `onnx_runtime/tensorflow-classifier`: exit 0, malamute 0.532603, render
+  `838d41ef` — the P3-02 stale-preprocessor diagnosis confirmed live.
+  FAILED 24→23, RUNTIME_PASS 174→175.
+- Session `2026-10-31-ort-rebuild-1`: Slurm `sbatch` unreachable from this
+  host (client/controller version mismatch); routed per runbook via SSH.
+  Remote `onnxruntime` image build on optiplex failed (GPU tgz wget exit 8);
+  local container rebuild is the evidence that counts. `nert` has no
+  Dockerfile — skipped as pre-screen target; local rebuild queued instead.
+- Matrix totals: `RUNTIME_PASS` 175, `FAILED` 23, `TIMEOUT` 12,
+  `KNOWN_BAD` 10, `EXPORT_BLOCKED` 159, `NOT_APPLICABLE` 51. 13 decisions.
