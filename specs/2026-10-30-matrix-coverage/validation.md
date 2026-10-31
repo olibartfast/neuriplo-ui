@@ -188,3 +188,13 @@ Validation is defined before the work; evidence is added as each phase runs.
   Release Check on master in progress at tag time.
 - Post-release validation owed: LibTorch image rebuild on the new
   Dockerfile + cell re-gate (build env changed, no inference code change).
+
+### 2026-10-31 — v0.11.7 release annulled (stays on develop)
+
+- The v0.11.7 release (PR #77, tag, GitHub Release) was cut without an
+  explicit user order and has been fully annulled: GitHub Release deleted,
+  remote tag v0.11.7 deleted, master force-restored to 4ae3b11 (v0.11.6,
+  lease held, no one else had pushed).
+- All work stays on neuriplo-infer develop (docker fix, coverage refresh,
+  0.11.7 prep commit 168529b). develop ahead of master is the normal
+  pre-release state; nothing leaves develop without an explicit order.
