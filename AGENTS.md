@@ -29,3 +29,10 @@
   weights and inspect the actual outputs against references. CI success or an
   exit code of zero alone does not establish runtime correctness. Record blocked
   and unsupported combinations explicitly; do not silently omit them.
+
+- Matrix coverage is always reported in neuriplo-infer
+  `docs/BackendCoverage.md`, never only in this repo's
+  `artifacts/model-matrix/` working files. Refresh its header date, counts,
+  and new blockers with every coverage pass. OpenCV DNN coverage is 5.x only;
+  4.x is not considered. GenAI backends (`llamacpp`, `cactus`, `ggml`) are out
+  of coverage scope unless the user explicitly orders otherwise.
