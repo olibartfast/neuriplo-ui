@@ -36,3 +36,14 @@
   and new blockers with every coverage pass. OpenCV DNN coverage is 5.x only;
   4.x is not considered. GenAI backends (`llamacpp`, `cactus`, `ggml`) are out
   of coverage scope unless the user explicitly orders otherwise.
+
+## Agent Commit Signing
+
+Every commit produced by an AI agent MUST include a `Co-authored-by` trailer
+that identifies the agent, the LLM model used, and the agent vendor. The
+canonical agent table, vendor emails, and the rule that vendor emails must not
+map to real GitHub profiles live in
+[`neuriplo-platform/AGENTS.md`](https://github.com/olibartfast/neuriplo-platform/blob/main/AGENTS.md#agent-commit-signing).
+
+Place the trailer in the commit body (after the subject line and blank line),
+not the subject.
